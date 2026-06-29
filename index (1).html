@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CRES Portal — Event Estimate</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#10243e">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root{
+    --navy:#10243e; --navy-deep:#0a1830; --gold:#c89b3c; --gold-soft:#e8d9b5;
+    --paper:#f6f3ec; --ink:#1c2430; --muted:#6b7280; --line:#dfd9c9;
+    --ok:#1e7a4c; --err:#b3261e; --radius:10px;
+    font-family:"Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--paper); color:var(--ink); font-size:15px;}
+  @media (max-width:760px){ body{font-size:16px;} }
+  .topbar{background:var(--navy); color:white; padding:16px 24px;}
+  .topbar .mark{font-weight:700; font-size:22px;}
+  .topbar .sub{font-size:12px; color:var(--gold-soft); letter-spacing:1.5px; text-transform:uppercase;}
+  .container{max-width:1100px; margin:0 auto; padding:24px 18px 60px;}
+  .hint-banner{background:#fff8e8; border:1px solid var(--gold-soft); border-radius:8px; padding:10px 14px; font-size:12.5px; color:#6b5512; margin-bottom:18px;}
+
+  .mode-tabs{display:flex; gap:8px; margin-bottom:18px;}
+  .mode-tab{flex:1; text-align:center; padding:13px; border-radius:8px; border:1px solid var(--line); background:white; cursor:pointer; font-weight:600; font-size:14px; color:var(--muted);}
+  .mode-tab.active{background:var(--navy); color:white; border-color:var(--navy);}
+
+  .picker-card{background:white; border:1px solid var(--line); border-radius:var(--radius); padding:18px; margin-bottom:18px;}
+  .form-card{background:white; border:1px solid var(--line); border-radius:var(--radius); padding:20px; margin-bottom:16px;}
+  .form-card h3{margin:0 0 14px; font-size:17px; color:var(--navy);}
+  .field{margin-bottom:14px;}
+  .field label{display:block; font-size:13px; font-weight:600; margin-bottom:5px;}
+  input, select{width:100%; padding:10px 12px; border:1px solid var(--line); border-radius:6px; font-size:15px; background:var(--paper); color:var(--ink); font-family:inherit;}
+  input:focus, select:focus{outline:2px solid var(--gold); outline-offset:1px; background:white;}
+  .row3{display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px;}
+  .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+  @media (max-width:680px){.row3, .row2{grid-template-columns:1fr;}}
+
+  .day-tabs{display:flex; gap:6px; margin-bottom:14px; flex-wrap:wrap; align-items:center;}
+  .day-tab{padding:9px 16px; border:1px solid var(--line); background:white; border-radius:6px; cursor:pointer; font-size:14px; font-weight:600; color:var(--muted); display:flex; align-items:center; gap:6px;}
+  .day-tab.active{background:var(--navy); color:white; border-color:var(--navy);}
+  .day-tab .x{font-size:11px; opacity:0.7;}
+  .add-day-btn{padding:8px 12px; border:1px dashed var(--gold); background:transparent; border-radius:6px; cursor:pointer; font-size:12px; color:var(--navy); font-weight:600;}
+
+  .category{border:1px solid var(--line); border-radius:8px; margin-bottom:10px; background:white; overflow:hidden;}
+  .cat-header{padding:14px 18px; background:#fafaf6; cursor:pointer; display:flex; justify-content:space-between; align-items:center; font-weight:700; font-size:15.5px; color:var(--navy); border-left:4px solid var(--gold);}
+  .cat-header .right{display:flex; gap:14px; align-items:center;}
+  .cat-header .cat-total{font-size:13.5px; color:var(--muted); font-weight:600;}
+  .cat-header .chev{font-size:11px; color:var(--muted); transition:transform 0.15s;}
+  .cat-body{display:none; padding:8px 12px 12px;}
+  .category.open .cat-body{display:block;}
+  .category.open .chev{transform:rotate(90deg);}
+
+  .subsection{margin-top:6px; padding:6px 4px 2px; border-top:1px dashed var(--line);}
+  .subsection:first-child{border-top:none;}
+  .subsection-title{font-size:12.5px; font-weight:700; color:var(--gold); text-transform:uppercase; letter-spacing:0.6px; margin:6px 4px 8px;}
+
+  .item-table{width:100%; border-collapse:collapse; font-size:13.5px;}
+  .item-table th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.4px; color:var(--muted); padding:7px 4px; border-bottom:1px solid var(--line); font-weight:600;}
+  .item-table td{padding:6px 4px; border-bottom:1px solid #f0eada; vertical-align:middle;}
+  .item-table .item-name{font-size:13.5px; font-weight:600; min-width:160px;}
+  .item-table input{padding:7px 9px; font-size:14px;}
+  .item-table .amount-cell{font-size:13.5px; text-align:right; white-space:nowrap; color:var(--muted); font-weight:600;}
+  .item-table tr.has-value{background:#fbf8f0;}
+  .item-table tr.has-value .item-name, .item-table tr.has-value .amount-cell{color:var(--navy);}
+  .c-desc{width:18%;} .c-size{width:14%;} .c-sqft{width:7%;} .c-days{width:6%;} .c-qty{width:6%;} .c-rate{width:10%;} .c-amt{width:11%;}
+
+  @media (max-width:760px){
+    .item-table thead{display:none;}
+    .item-table, .item-table tbody, .item-table tr, .item-table td{display:block; width:100%;}
+    .item-table tr{border:1px solid var(--line); border-radius:8px; padding:10px; margin-bottom:8px; background:white;}
+    .item-table tr.has-value{background:#fbf8f0;}
+    .item-table td{border:none; padding:4px 0;}
+    .item-table td:before{content:attr(data-label); font-size:11.5px; text-transform:uppercase; color:var(--muted); font-weight:600; display:block; margin-bottom:3px;}
+    .item-table .item-name:before{display:none;}
+    .item-table .amount-cell{text-align:left;}
+  }
+
+  .day-summary{margin-top:10px; padding:12px 18px; background:var(--navy); color:white; border-radius:8px; display:flex; justify-content:space-between; font-size:15px; font-weight:600;}
+
+  .summary-card{background:white; border:2px solid var(--navy); border-radius:var(--radius); padding:22px;}
+  .summary-card h3{margin:0 0 16px; font-size:17px; color:var(--navy);}
+  .sum-row{display:flex; justify-content:space-between; padding:9px 0; border-bottom:1px dashed var(--line); font-size:14.5px;}
+  .sum-row:last-child{border-bottom:none;}
+  .sum-row.grand{margin-top:8px; padding-top:14px; border-top:2px solid var(--navy); font-size:18px; font-weight:700; color:var(--navy);}
+  .sum-input{width:90px; padding:5px 7px; font-size:13px; text-align:right;}
+
+  .actions{margin-top:18px; display:flex; gap:10px; flex-wrap:wrap;}
+  .btn{flex:1; min-width:140px; padding:14px; border-radius:8px; font-size:15px; font-weight:600; cursor:pointer; border:none;}
+  .btn-primary{background:var(--navy); color:white;}
+  .btn-primary:hover{background:var(--navy-deep);}
+  .btn-secondary{background:white; color:var(--navy); border:1px solid var(--navy);}
+  .btn:disabled{opacity:0.6; cursor:default;}
+
+  .status{margin-top:14px; font-size:13px; padding:10px 12px; border-radius:8px; display:none;}
+  .status.ok{display:block; background:#e7f4ec; color:var(--ok); border:1px solid #bfe3cc;}
+  .status.err{display:block; background:#fbe9e7; color:var(--err); border:1px solid #f3c6c0;}
+  .status.info{display:block; background:#eef2f9; color:var(--navy); border:1px solid #cdd9ec;}
+  .status a{color:var(--navy); font-weight:600;}
+
+  footer{text-align:center; font-size:11px; color:var(--muted); padding:18px;}
+  .day-pane{display:none;} .day-pane.active{display:block;}
+  .version-tag{display:inline-block; padding:2px 8px; background:var(--gold-soft); color:#6b5512; border-radius:4px; font-size:11px; font-weight:700; margin-left:8px;}
+
+  .add-item-btn{
+    margin:8px 4px 12px; padding:7px 14px; background:transparent; border:1px dashed var(--gold);
+    color:var(--navy); border-radius:6px; cursor:pointer; font-size:12.5px; font-weight:600;
+  }
+  .add-item-btn:hover{background:#fff8e8;}
+  .row-remove{
+    display:inline-block; margin-left:6px; color:var(--err); cursor:pointer; font-size:14px;
+    font-weight:700; padding:2px 6px; border-radius:4px;
+  }
+  .row-remove:hover{background:#fbe9e7;}
+  .sqft-wrap{display:flex; align-items:center; gap:6px;}
+  .sqft-wrap input[type=checkbox]{width:auto; padding:0; margin:0; cursor:pointer; flex-shrink:0;}
+  .sqft-wrap input[type=number]{flex:1; min-width:0;}
+  .item-name input.f-itemname{
+    width:100%; padding:6px 8px; font-size:13px; font-weight:600;
+    border:1px dashed var(--gold); background:#fffceb;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="mark">CRES Portal</div>
+  <div class="sub">Event Estimate — Internal Use Only</div>
+</div>
+
+<div class="container">
+
+  <div class="mode-tabs">
+    <div class="mode-tab active" id="tab-new" onclick="setMode('new')">+ New Event</div>
+    <div class="mode-tab" id="tab-edit" onclick="setMode('edit')">✎ Edit Existing Event</div>
+  </div>
+
+  <!-- EDIT MODE PICKER -->
+  <div class="picker-card" id="editPicker" style="display:none;">
+    <div class="row2">
+      <div class="field">
+        <label>Select Event</label>
+        <select id="eventPicker"><option value="">Loading events...</option></select>
+      </div>
+      <div class="field">
+        <label>Version <span class="version-tag" id="latestTag" style="display:none;">latest</span></label>
+        <select id="versionPicker" disabled><option value="">—</option></select>
+      </div>
+    </div>
+    <div class="status info" id="editLoadStatus" style="display:none;"></div>
+  </div>
+
+  <form id="estimateForm" style="display:none;">
+
+    <!-- EVENT HEADER -->
+    <div class="form-card">
+      <h3>Event Details</h3>
+      <div class="row3">
+        <div class="field"><label>Client *</label><input type="text" id="client" required></div>
+        <div class="field"><label>Event Name *</label><input type="text" id="eventName" required></div>
+        <div class="field"><label>Venue</label><input type="text" id="venue"></div>
+      </div>
+    </div>
+
+    <!-- DAY TABS -->
+    <div class="day-tabs" id="dayTabs"></div>
+    <div id="dayPanes"></div>
+
+    <!-- LOGISTICS -->
+    <div class="form-card">
+      <h3>Logistics (Transport)</h3>
+      <div id="logisticsBody"></div>
+      <div class="day-summary"><span>Logistics Total</span><span id="logisticsTotal">₹0</span></div>
+    </div>
+
+    <!-- SUMMARY -->
+    <div class="summary-card">
+      <h3>Estimate Summary</h3>
+      <div id="daySummaries"></div>
+      <div class="sum-row"><span>Logistics</span><span id="sumLogistics">₹0</span></div>
+      <div class="sum-row" style="font-weight:700; color:var(--navy);"><span>Subtotal</span><span id="sumSubtotal">₹0</span></div>
+      <div class="sum-row"><span>Management Fee <input type="number" class="sum-input" id="mgmtPct" value="10" min="0" max="100" step="0.5">%</span><span id="sumMgmt">₹0</span></div>
+      <div class="sum-row"><span>Hotel Coordination Charges</span><span>₹ <input type="number" class="sum-input" id="hotelCoord" value="0" min="0" step="1000"></span></div>
+      <div class="sum-row" style="font-weight:700;"><span>Sub Total before GST</span><span id="sumPreGst">₹0</span></div>
+      <div class="sum-row"><span>GST <input type="number" class="sum-input" id="gstPct" value="18" min="0" max="100" step="0.5">%</span><span id="sumGst">₹0</span></div>
+      <div class="sum-row grand"><span>Grand Total</span><span id="sumGrand">₹0</span></div>
+
+      <div class="actions" id="actionsNew" style="display:none;">
+        <button type="button" class="btn btn-primary" onclick="submitForm('create')">Submit Estimate (V1)</button>
+      </div>
+      <div class="actions" id="actionsEdit" style="display:none;">
+        <button type="button" class="btn btn-secondary" onclick="submitForm('updateCurrent')">Update Current Version</button>
+        <button type="button" class="btn btn-primary" onclick="submitForm('saveAsNew')">Save as New Version</button>
+      </div>
+      <div class="status" id="statusMsg"></div>
+    </div>
+
+  </form>
+
+</div>
+
+<footer>Creative Rays Entertainment Solutions — Internal Tool</footer>
+
+<script>
+// ===================== CONFIG =====================
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyvWJ1YGfYLeIIsAJ4zdDFG4uBODhbI-XJGpPgzbe3pe49dIUfpGduUUIu2zD2wAriB/exec";
+
+const CATEGORIES = [
+  { name: "Welcome (Hotel Registration)", subs: [
+    { title: "Branding", items: [
+      { name: "Registration Backdrop", size: "12ft w x 8ft h", sqft: 96 },
+      { name: "Registration Desk Facade", sqft: 42.5 },
+      { name: "Info Desk in Lobby", size: "8ft x 8ft" }
+    ]},
+    { title: "Manpower", items: [
+      { name: "Hostess" }, { name: "Volunteers" }
+    ]}
+  ]},
+  { name: "Artist & Entertainment", subs: [
+    { title: "Performances", items: [
+      { name: "Live Band / Base Band" }, { name: "DJ (Bollywood / English)" }
+    ]},
+    { title: "Permissions & Licenses", items: [
+      { name: "IPRS / PWD / Police intimation (Band)" },
+      { name: "PWD / IPRS / NOVEX / PPL (DJ)" },
+      { name: "Graphic Designer" }
+    ]}
+  ]},
+  { name: "Fabrication", subs: [
+    { title: "Main Entrance Gate Arch", items: [
+      { name: "Top with frame and flex" },
+      { name: "Pillars with frame and flex" },
+      { name: "Ballroom Entrance Arch" }
+    ]},
+    { title: "Stage", items: [
+      { name: "Platform for Stage", size: "44ft x 18ft x 2.5ft" },
+      { name: "Skirting for Stage" },
+      { name: "LED Riser", size: "32ft x 1ft" },
+      { name: "Skirting for LED Riser" },
+      { name: "Steps" },
+      { name: "Side Panel", size: "4ft x 12ft" },
+      { name: "Side View Cutter", size: "5ft x 11ft" },
+      { name: "Podium", size: "2ft x 4ft" },
+      { name: "Console with Black Masking" },
+      { name: "Camera Riser", size: "6ft x 4ft x 1.5ft" },
+      { name: "LED Side Riser", size: "12ft x 4ft x 4ft" }
+    ]},
+    { title: "Branding", items: [
+      { name: "Standees", size: "4ft x 6ft" },
+      { name: "Customized Photo Booth", size: "12ft x 10ft" }
+    ]}
+  ]},
+  { name: "Sound", subs: [
+    { title: "Equipment", items: [
+      { name: "Tops (JBL VRX)" }, { name: "Dual Base for Stage" },
+      { name: "Stage Monitors" }, { name: "Cordless Mics" },
+      { name: "Headset Mics" }, { name: "Podium Mics" },
+      { name: "Mixer / Pioneer Player" }, { name: "Cabling and Technicians" }
+    ]}
+  ]},
+  { name: "Lights", subs: [
+    { title: "Fixtures", items: [
+      { name: "LED Par Cans RGB" }, { name: "LED Par Cans Face Light" },
+      { name: "Sharpy" }, { name: "Moving LED Wash" },
+      { name: "Profile" }, { name: "Smoke" },
+      { name: "Light Technician & Operator" }
+    ]},
+    { title: "Structures", items: [
+      { name: "Front Goal Post", size: "60ft x 20ft" }
+    ]}
+  ]},
+  { name: "LED Wall (2.9)", subs: [
+    { title: "Screens", items: [
+      { name: "Main LED Wall", size: "36ft x 11.5ft" },
+      { name: "Side Screen", size: "12ft x 8ft" },
+      { name: "Comfort Plasma" }, { name: "Timer Plasma" }
+    ]},
+    { title: "Control", items: [
+      { name: "Switcher" }, { name: "Clicker" }, { name: "Laptops" },
+      { name: "Resolume Server" }, { name: "Operator" }, { name: "Watchout" }
+    ]}
+  ]},
+  { name: "Generator", subs: [
+    { title: "Power", items: [
+      { name: "Generator (125 KVA)" }, { name: "Cabling" }, { name: "Operator" }
+    ]}
+  ]},
+  { name: "Event Coverage", subs: [
+    { title: "Photo & Video", items: [
+      { name: "Photographer" },
+      { name: "Videographer (Wide Angle + Gimble)" },
+      { name: "Montage / Highlight Video" }
+    ]}
+  ]},
+  { name: "Activities", subs: [
+    { title: "Engagement Booths", items: [
+      { name: "360° Photo Booth" }, { name: "Instant Photo Strip" },
+      { name: "Word Cloud Selfie Booth" }
+    ]}
+  ]},
+  { name: "Communication", subs: [
+    { title: "Equipment", items: [ { name: "Clearcom / Walkies" } ]}
+  ]},
+  { name: "Misc & Transport", subs: [
+    { title: "Setup", items: [
+      { name: "Setup Transport (labour, mathadi, equipment)" },
+      { name: "Crew Food / Promoters / Hostess" },
+      { name: "Miscellaneous Expenses" },
+      { name: "TBL (team stay + food)" }
+    ]}
+  ]}
+];
+
+const LOGISTICS = [
+  { vehicle: "Sedan", routes: ["Pune Airport to JW Marriott", "Mumbai to Pune"] },
+  { vehicle: "Innova Crysta", routes: ["Pune Airport to JW Marriott", "Mumbai to Pune"] },
+  { vehicle: "Toyota Hycross", routes: ["Pune Airport to JW Marriott", "Mumbai to Pune"] },
+  { vehicle: "35/40 Seater AC Bus", routes: ["Pune Airport to JW Marriott"] }
+];
+
+// ===================== STATE =====================
+let mode = "new";
+let days = [];
+let activeDay = null;
+let dayCounter = 0;
+let currentEventId = null;
+let currentVersion = null;
+let currentEventName = null;
+
+// ===================== MODE =====================
+function setMode(m){
+  mode = m;
+  document.getElementById('tab-new').classList.toggle('active', m==='new');
+  document.getElementById('tab-edit').classList.toggle('active', m==='edit');
+  document.getElementById('editPicker').style.display = m==='edit' ? 'block' : 'none';
+  document.getElementById('estimateForm').style.display = m==='new' ? 'block' : 'none';
+  document.getElementById('actionsNew').style.display = m==='new' ? 'flex' : 'none';
+  document.getElementById('actionsEdit').style.display = 'none';
+  resetForm();
+  if(m==='new'){ days=[]; dayCounter=0; document.getElementById('dayPanes').innerHTML=""; addDay("Day 1"); }
+  if(m==='edit'){ loadEventList(); }
+}
+
+function resetForm(){
+  document.getElementById('client').value="";
+  document.getElementById('eventName').value="";
+  document.getElementById('venue').value="";
+  document.getElementById('mgmtPct').value=10;
+  document.getElementById('hotelCoord').value=0;
+  document.getElementById('gstPct').value=18;
+  currentEventId=null; currentVersion=null; currentEventName=null;
+}
+
+// ===================== DAY MGMT =====================
+function addDay(label){
+  dayCounter++;
+  const id = "day"+dayCounter;
+  days.push({ id, label: label || `Day ${days.length+1}`, date: "" });
+  buildDayPane(id);
+  renderDayTabs();
+  switchDay(id);
+  recalc();
+}
+
+function renderDayTabs(){
+  const tabs = document.getElementById('dayTabs');
+  tabs.innerHTML = "";
+  days.forEach(d => {
+    const t = document.createElement('div');
+    t.className = 'day-tab' + (d.id===activeDay?' active':'');
+    t.innerHTML = `<span onclick="switchDay('${d.id}')">${d.label}</span>` +
+      (days.length>1 ? `<span class="x" onclick="removeDay('${d.id}',event)">✕</span>` : '');
+    tabs.appendChild(t);
+  });
+  const addBtn = document.createElement('button');
+  addBtn.type="button"; addBtn.className='add-day-btn'; addBtn.textContent='+ Add Day';
+  addBtn.onclick = () => addDay();
+  tabs.appendChild(addBtn);
+}
+
+function switchDay(id){
+  activeDay = id;
+  document.querySelectorAll('.day-pane').forEach(p=>p.classList.remove('active'));
+  const pane = document.getElementById(id);
+  if(pane) pane.classList.add('active');
+  renderDayTabs();
+}
+
+function removeDay(id, e){
+  e.stopPropagation();
+  if(days.length<=1) return;
+  days = days.filter(d=>d.id!==id);
+  const el = document.getElementById(id); if(el) el.remove();
+  if(activeDay===id) activeDay = days[0].id;
+  renderDayTabs(); switchDay(activeDay); recalc();
+}
+
+function buildDayPane(id){
+  const pane = document.createElement('div');
+  pane.className='day-pane'; pane.id=id;
+  const d = days.find(x=>x.id===id);
+
+  const dateCard = document.createElement('div');
+  dateCard.className='form-card';
+  dateCard.innerHTML = `
+    <div class="row2">
+      <div class="field"><label>Day Label</label>
+        <input type="text" value="${d.label}" onchange="updateDayLabel('${id}',this.value)"></div>
+      <div class="field"><label>Date</label>
+        <input type="date" class="day-date" data-day="${id}" onchange="updateDayDate('${id}',this.value)"></div>
+    </div>`;
+  pane.appendChild(dateCard);
+
+  CATEGORIES.forEach((cat,ci)=>{
+    const box = document.createElement('div');
+    box.className='category';
+    box.innerHTML = `
+      <div class="cat-header" onclick="this.parentElement.classList.toggle('open')">
+        <span><span class="cat-num">${ci+1}.</span> ${cat.name}</span>
+        <span class="right"><span class="cat-total">₹0</span><span class="chev">▶</span></span>
+      </div>
+      <div class="cat-body"></div>`;
+    const body = box.querySelector('.cat-body');
+
+    cat.subs.forEach((sub,si)=>{
+      const sd = document.createElement('div');
+      sd.className='subsection';
+      sd.innerHTML = `<div class="subsection-title">${sub.title}</div>`;
+      const table = document.createElement('table');
+      table.className='item-table';
+      table.dataset.day=id; table.dataset.cat=ci; table.dataset.sub=si;
+      table.innerHTML = `<thead><tr>
+        <th>Item</th><th class="c-desc">Description</th><th class="c-size">Size</th>
+        <th class="c-sqft">Sqft</th><th class="c-days">Days</th>
+        <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th>
+      </tr></thead><tbody></tbody>`;
+      const tbody = table.querySelector('tbody');
+
+      sub.items.forEach((item)=>{
+        addItemRow(tbody, { day:id, ci, si, subtitle:sub.title, catname:cat.name, item, custom:false });
+      });
+      sd.appendChild(table);
+
+      const addBtn = document.createElement('button');
+      addBtn.type='button'; addBtn.className='add-item-btn';
+      addBtn.textContent = '+ Add Item';
+      addBtn.onclick = () => {
+        const newTr = addItemRow(tbody, { day:id, ci, si, subtitle:sub.title, catname:cat.name, custom:true });
+        const inp = newTr.querySelector('.f-itemname'); if(inp) inp.focus();
+      };
+      sd.appendChild(addBtn);
+      body.appendChild(sd);
+    });
+    pane.appendChild(box);
+  });
+
+  const customCatsBox = document.createElement('div');
+  customCatsBox.className = 'custom-cats';
+  customCatsBox.dataset.day = id;
+  pane.appendChild(customCatsBox);
+
+  const addCatBtn = document.createElement('button');
+  addCatBtn.type='button'; addCatBtn.className='add-item-btn';
+  addCatBtn.style.marginTop='8px';
+  addCatBtn.textContent = '+ Add Category';
+  addCatBtn.onclick = () => {
+    const newBox = addCustomCategory(id, customCatsBox);
+    const inp = newBox.querySelector('.cat-name-input'); if(inp) inp.focus();
+  };
+  pane.appendChild(addCatBtn);
+
+  const ds = document.createElement('div');
+  ds.className='day-summary';
+  ds.innerHTML = `<span>${d.label} Total</span><span id="${id}-total">₹0</span>`;
+  pane.appendChild(ds);
+
+  document.getElementById('dayPanes').appendChild(pane);
+}
+
+function addItemRow(tbody, opts){
+  const tr = document.createElement('tr');
+  tr.dataset.day=opts.day; tr.dataset.cat=opts.ci; tr.dataset.sub=opts.si;
+  tr.dataset.subtitle=opts.subtitle; tr.dataset.catname=opts.catname;
+  tr.dataset.custom = opts.custom ? "1" : "0";
+  tr.dataset.item = opts.custom ? "" : (opts.item?.name || "");
+
+  const isFab = opts.catname === "Fabrication";
+  const item = opts.item || {};
+
+  const itemCell = opts.custom
+    ? `<td class="item-name" data-label="Item"><input type="text" class="f-itemname" placeholder="New item name" value="${item.name||''}"><span class="row-remove" onclick="this.closest('tr').remove(); recalc();" title="Remove">✕</span></td>`
+    : `<td class="item-name">${item.name||''}</td>`;
+
+  const sqftCell = isFab
+    ? `<td class="c-sqft" data-label="Sqft"><div class="sqft-wrap"><input type="checkbox" class="f-usesqft" title="Multiply Sqft in Amount"><input type="number" class="f-sqft" step="0.01"></div></td>`
+    : `<td class="c-sqft" data-label="Sqft"><input type="number" class="f-sqft" step="0.01"></td>`;
+
+  tr.innerHTML = itemCell + `
+    <td class="c-desc" data-label="Description"><input type="text" class="f-desc"></td>
+    <td class="c-size" data-label="Size"><input type="text" class="f-size"></td>
+    ${sqftCell}
+    <td class="c-days" data-label="Days"><input type="number" class="f-days" min="0" step="1"></td>
+    <td class="c-qty" data-label="Qty"><input type="number" class="f-qty" min="0" step="1"></td>
+    <td class="c-rate" data-label="Rate (₹)"><input type="number" class="f-rate" min="0" step="0.01"></td>
+    <td class="amount-cell" data-label="Amount">—</td>`;
+
+  tbody.appendChild(tr);
+  tr.querySelectorAll('input').forEach(el => el.addEventListener('input', recalc));
+  return tr;
+}
+
+function addCustomCategory(dayId, container, presetName){
+  const box = document.createElement('div');
+  box.className = 'category open';
+  box.dataset.custom = "1";
+  box.innerHTML = `
+    <div class="cat-header">
+      <span style="display:flex; align-items:center; gap:8px; flex:1; min-width:0;">
+        <span class="cat-num">?.</span>
+        <input type="text" class="cat-name-input" placeholder="Category name" value="${presetName||''}" style="flex:1; padding:6px 10px; font-size:14.5px; font-weight:700; border:1px dashed var(--gold); background:#fffceb; color:var(--navy);">
+      </span>
+      <span class="right">
+        <span class="cat-total">₹0</span>
+        <span class="row-remove" title="Remove category">✕</span>
+      </span>
+    </div>
+    <div class="cat-body">
+      <div class="custom-subs"></div>
+      <button type="button" class="add-item-btn add-sub-btn">+ Add Sub-section</button>
+    </div>`;
+  container.appendChild(box);
+  renumberCustomCategories(dayId);
+
+  const nameInput = box.querySelector('.cat-name-input');
+  nameInput.addEventListener('input', () => {
+    box.querySelectorAll('tr').forEach(tr => tr.dataset.catname = nameInput.value);
+  });
+
+  box.querySelector('.row-remove').onclick = (e) => {
+    e.stopPropagation();
+    box.remove();
+    renumberCustomCategories(dayId);
+    recalc();
+  };
+
+  const subsBox = box.querySelector('.custom-subs');
+  box.querySelector('.add-sub-btn').onclick = () => {
+    const sd = addCustomSubsection(dayId, box, subsBox);
+    const inp = sd.querySelector('.sub-title-input'); if(inp) inp.focus();
+  };
+
+  // Toggle open/close on header click, but not when interacting with inputs/remove
+  box.querySelector('.cat-header').addEventListener('click', (e) => {
+    if(e.target.tagName === 'INPUT' || e.target.classList.contains('row-remove')) return;
+    box.classList.toggle('open');
+  });
+
+  return box;
+}
+
+function addCustomSubsection(dayId, catBox, container, presetTitle){
+  const sd = document.createElement('div');
+  sd.className = 'subsection';
+  sd.innerHTML = `
+    <div class="subsection-title" style="display:flex; align-items:center; gap:8px;">
+      <input type="text" class="sub-title-input" placeholder="Sub-section title" value="${presetTitle||''}" style="padding:5px 8px; font-size:12.5px; font-weight:700; border:1px dashed var(--gold); background:#fffceb; color:var(--gold); text-transform:uppercase; letter-spacing:0.5px; flex:1; max-width:300px;">
+      <span class="row-remove" title="Remove sub-section">✕</span>
+    </div>`;
+  const table = document.createElement('table');
+  table.className = 'item-table';
+  table.innerHTML = `<thead><tr>
+    <th>Item</th><th class="c-desc">Description</th><th class="c-size">Size</th>
+    <th class="c-sqft">Sqft</th><th class="c-days">Days</th>
+    <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th>
+  </tr></thead><tbody></tbody>`;
+  sd.appendChild(table);
+
+  const addItemBtn = document.createElement('button');
+  addItemBtn.type='button'; addItemBtn.className='add-item-btn';
+  addItemBtn.textContent='+ Add Item';
+  sd.appendChild(addItemBtn);
+
+  const catNameInput = catBox.querySelector('.cat-name-input');
+  const subTitleEl = sd.querySelector('.sub-title-input');
+
+  addItemBtn.onclick = () => {
+    const tr = addItemRow(table.querySelector('tbody'), {
+      day: dayId, ci: 'cust', si: 'cust',
+      subtitle: subTitleEl.value || 'Untitled',
+      catname: catNameInput.value || 'Untitled',
+      custom: true
+    });
+    const inp = tr.querySelector('.f-itemname'); if(inp) inp.focus();
+  };
+
+  subTitleEl.addEventListener('input', () => {
+    table.querySelectorAll('tr').forEach(tr => tr.dataset.subtitle = subTitleEl.value);
+  });
+
+  sd.querySelector('.row-remove').onclick = () => {
+    sd.remove();
+    recalc();
+  };
+
+  container.appendChild(sd);
+  return sd;
+}
+
+function renumberCustomCategories(dayId){
+  const dayPane = document.getElementById(dayId);
+  if(!dayPane) return;
+  const fixedCount = CATEGORIES.length;
+  const customBoxes = dayPane.querySelectorAll('.custom-cats .category');
+  customBoxes.forEach((box, i) => {
+    const numSpan = box.querySelector('.cat-num');
+    if(numSpan) numSpan.textContent = (fixedCount + i + 1) + '.';
+  });
+}
+
+function updateDayLabel(id,val){
+  const d = days.find(x=>x.id===id); if(d) d.label = val;
+  renderDayTabs();
+  const totalRow = document.querySelector(`#${id} .day-summary span:first-child`);
+  if(totalRow) totalRow.textContent = val + ' Total';
+}
+function updateDayDate(id,val){
+  const d = days.find(x=>x.id===id); if(d) d.date = val;
+}
+
+// ===================== LOGISTICS =====================
+function buildLogistics(){
+  const box = document.getElementById('logisticsBody');
+  box.innerHTML = "";
+  const table = document.createElement('table');
+  table.className='item-table'; table.id='logisticsTable';
+  table.innerHTML = `<thead><tr>
+    <th>Vehicle</th><th>Route</th>
+    <th class="c-qty">Qty</th><th class="c-rate">Rate</th>
+    <th class="c-amt">Amount</th><th style="width:30px;"></th>
+  </tr></thead><tbody></tbody>`;
+  box.appendChild(table);
+
+  const addBtn = document.createElement('button');
+  addBtn.type='button'; addBtn.className='add-item-btn';
+  addBtn.textContent = '+ Add Logistics Row';
+  addBtn.onclick = () => {
+    const tr = addLogisticsRow();
+    const inp = tr.querySelector('.f-vehicle'); if(inp) inp.focus();
+  };
+  box.appendChild(addBtn);
+}
+
+function addLogisticsRow(data){
+  const tbody = document.querySelector('#logisticsTable tbody');
+  const tr = document.createElement('tr');
+  tr.dataset.log="1";
+  tr.innerHTML = `
+    <td class="item-name" data-label="Vehicle"><input type="text" class="f-vehicle" placeholder="e.g. Sedan" value="${data?.vehicle||''}"></td>
+    <td data-label="Route"><input type="text" class="f-route" placeholder="e.g. Pune Airport to JW" value="${data?.route||''}"></td>
+    <td class="c-qty" data-label="Qty"><input type="number" class="f-qty" min="0" step="1" value="${data?.qty||''}"></td>
+    <td class="c-rate" data-label="Rate (₹)"><input type="number" class="f-rate" min="0" step="0.01" value="${data?.rate||''}"></td>
+    <td class="amount-cell" data-label="Amount">—</td>
+    <td><span class="row-remove" onclick="this.closest('tr').remove(); recalc();" title="Remove">✕</span></td>`;
+  tbody.appendChild(tr);
+  tr.querySelectorAll('input').forEach(el=>el.addEventListener('input', recalc));
+  return tr;
+}
+
+// ===================== CALC =====================
+function fmt(n){ return '₹' + Math.round(n).toLocaleString('en-IN'); }
+
+function recalc(){
+  let subtotal = 0;
+  const summaries = [];
+
+  days.forEach(d => {
+    let dayTotal = 0;
+    const dayPane = document.getElementById(d.id);
+    if(!dayPane){ summaries.push(`<div class="sum-row"><span>${d.label}</span><span>${fmt(0)}</span></div>`); return; }
+
+    dayPane.querySelectorAll('.category').forEach(box => {
+      let catTotal = 0;
+      box.querySelectorAll('tr').forEach(tr => {
+        const qtyEl = tr.querySelector('.f-qty');
+        if(!qtyEl) return;
+        const dys = parseFloat(tr.querySelector('.f-days')?.value);
+        const qty = parseFloat(qtyEl.value) || 0;
+        const rate = parseFloat(tr.querySelector('.f-rate')?.value) || 0;
+        const sqft = parseFloat(tr.querySelector('.f-sqft')?.value) || 0;
+        const useSqftEl = tr.querySelector('.f-usesqft');
+        const useSqft = useSqftEl ? useSqftEl.checked : false;
+        const effectiveDays = (isNaN(dys) || dys===0) ? 1 : dys;
+        const sqftMult = (useSqft && sqft>0) ? sqft : 1;
+        const amt = effectiveDays * qty * rate * sqftMult;
+        const cell = tr.querySelector('.amount-cell');
+        if(cell){
+          if(qty>0 || rate>0){
+            tr.classList.add('has-value');
+            cell.textContent = amt>0 ? fmt(amt) : '—';
+          } else {
+            tr.classList.remove('has-value');
+            cell.textContent = '—';
+          }
+        }
+        catTotal += amt;
+      });
+      const ct = box.querySelector('.cat-total');
+      if(ct) ct.textContent = catTotal>0 ? fmt(catTotal) : '₹0';
+      dayTotal += catTotal;
+    });
+
+    const dt = document.getElementById(`${d.id}-total`);
+    if(dt) dt.textContent = fmt(dayTotal);
+    subtotal += dayTotal;
+    summaries.push(`<div class="sum-row"><span>${d.label}</span><span>${fmt(dayTotal)}</span></div>`);
+  });
+
+  let logTotal = 0;
+  document.querySelectorAll('tr[data-log="1"]').forEach(tr=>{
+    const vehicle = tr.querySelector('.f-vehicle')?.value || "";
+    const qty = parseFloat(tr.querySelector('.f-qty').value) || 0;
+    const rate = parseFloat(tr.querySelector('.f-rate').value) || 0;
+    const amt = qty * rate;
+    const cell = tr.querySelector('.amount-cell');
+    if(qty>0 || rate>0 || vehicle){ tr.classList.add('has-value'); cell.textContent = amt>0 ? fmt(amt) : '—'; }
+    else { tr.classList.remove('has-value'); cell.textContent = '—'; }
+    logTotal += amt;
+  });
+  document.getElementById('logisticsTotal').textContent = fmt(logTotal);
+  document.getElementById('sumLogistics').textContent = fmt(logTotal);
+  subtotal += logTotal;
+
+  document.getElementById('daySummaries').innerHTML = summaries.join('');
+  document.getElementById('sumSubtotal').textContent = fmt(subtotal);
+
+  const mgmtPct = parseFloat(document.getElementById('mgmtPct').value) || 0;
+  const hotel = parseFloat(document.getElementById('hotelCoord').value) || 0;
+  const gstPct = parseFloat(document.getElementById('gstPct').value) || 0;
+  const mgmt = subtotal * mgmtPct/100;
+  const pre = subtotal + mgmt + hotel;
+  const gst = pre * gstPct/100;
+  const grand = pre + gst;
+
+  document.getElementById('sumMgmt').textContent = fmt(mgmt);
+  document.getElementById('sumPreGst').textContent = fmt(pre);
+  document.getElementById('sumGst').textContent = fmt(gst);
+  document.getElementById('sumGrand').textContent = fmt(grand);
+}
+
+// ===================== COLLECT PAYLOAD =====================
+function collectPayload(){
+  const lineItems = [];
+  days.forEach(d=>{
+    const dayPane = document.getElementById(d.id);
+    if(!dayPane) return;
+    dayPane.querySelectorAll('.category tr').forEach(tr => {
+      const qtyEl = tr.querySelector('.f-qty');
+      if(!qtyEl) return;
+      const isCustom = tr.dataset.custom === "1";
+      const itemName = isCustom
+        ? (tr.querySelector('.f-itemname')?.value || "").trim()
+        : tr.dataset.item;
+      const category = tr.dataset.catname || "";
+      const subSection = tr.dataset.subtitle || "";
+      const desc = tr.querySelector('.f-desc')?.value || "";
+      const size = tr.querySelector('.f-size')?.value || "";
+      const sqft = tr.querySelector('.f-sqft')?.value || "";
+      const dys = tr.querySelector('.f-days')?.value || "";
+      const qty = qtyEl.value;
+      const rate = tr.querySelector('.f-rate')?.value || "";
+      const useSqftEl = tr.querySelector('.f-usesqft');
+      const useSqft = useSqftEl ? useSqftEl.checked : false;
+      if((qty || rate) && itemName){
+        const eDays = (parseFloat(dys)||0)===0 ? 1 : parseFloat(dys);
+        const sMult = (useSqft && (parseFloat(sqft)||0) > 0) ? parseFloat(sqft) : 1;
+        const amt = eDays * (parseFloat(qty)||0) * (parseFloat(rate)||0) * sMult;
+        lineItems.push({
+          dayId: d.id, dayLabel: d.label, dayDate: d.date,
+          category, subSection, item: itemName,
+          isCustom: isCustom, useSqft: useSqft,
+          description: desc, size: size,
+          sqft: parseFloat(sqft)||"", days: parseFloat(dys)||"",
+          qty: parseFloat(qty)||0, rate: parseFloat(rate)||0, amount: amt
+        });
+      }
+    });
+  });
+  const logistics = [];
+  document.querySelectorAll('tr[data-log="1"]').forEach(tr=>{
+    const vehicle = (tr.querySelector('.f-vehicle')?.value || "").trim();
+    const route = (tr.querySelector('.f-route')?.value || "").trim();
+    const qty = tr.querySelector('.f-qty').value;
+    const rate = tr.querySelector('.f-rate').value;
+    if((qty || rate) && (vehicle || route)){
+      logistics.push({
+        vehicle: vehicle, route: route,
+        qty: parseFloat(qty)||0, rate: parseFloat(rate)||0,
+        amount: (parseFloat(qty)||0)*(parseFloat(rate)||0)
+      });
+    }
+  });
+  return {
+    header: {
+      client: document.getElementById('client').value,
+      eventName: document.getElementById('eventName').value,
+      venue: document.getElementById('venue').value
+    },
+    days: days.map(d=>({id:d.id, label:d.label, date:d.date})),
+    lineItems, logistics,
+    summary: {
+      mgmtPct: parseFloat(document.getElementById('mgmtPct').value)||0,
+      hotelCoord: parseFloat(document.getElementById('hotelCoord').value)||0,
+      gstPct: parseFloat(document.getElementById('gstPct').value)||0
+    }
+  };
+}
+
+// ===================== SUBMIT =====================
+async function submitForm(action){
+  const statusEl = document.getElementById('statusMsg');
+  const payload = collectPayload();
+  if(!payload.header.client || !payload.header.eventName){
+    statusEl.className="status err"; statusEl.textContent="Client and Event Name are required."; return;
+  }
+  payload.action = action;
+  payload.eventId = currentEventId;
+  payload.fromVersion = currentVersion;
+
+  if(SCRIPT_URL.includes("PASTE_YOUR")){
+    console.log("PAYLOAD (demo):", payload);
+    statusEl.className="status info";
+    statusEl.textContent = `Demo mode — payload logged to console. Connect SCRIPT_URL to save.`;
+    return;
+  }
+
+  statusEl.className="status info"; statusEl.textContent="Saving...";
+
+  try{
+    const res = await fetch(SCRIPT_URL, {
+      method:"POST", mode:"cors",
+      headers:{"Content-Type":"text/plain"},
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    if(data.status === "success"){
+      statusEl.className="status ok";
+      statusEl.innerHTML = `Saved as ${data.version}. <a href="${data.sheetUrl}" target="_blank">Open Sheet ↗</a>`;
+      if(action==='create' || action==='saveAsNew'){
+        currentEventId = data.eventId;
+        currentVersion = data.version;
+      }
+    } else {
+      statusEl.className="status err"; statusEl.textContent = "Error: " + (data.message||"unknown");
+    }
+  } catch(err){
+    statusEl.className="status err"; statusEl.textContent = "Network error: " + err.message;
+  }
+}
+
+// ===================== EDIT MODE =====================
+async function loadEventList(){
+  const picker = document.getElementById('eventPicker');
+  picker.innerHTML = `<option value="">Loading...</option>`;
+  if(SCRIPT_URL.includes("PASTE_YOUR")){
+    picker.innerHTML = `<option value="">(Demo) Connect SCRIPT_URL to load events</option>`; return;
+  }
+  try{
+    const res = await fetch(`${SCRIPT_URL}?action=listEvents`);
+    const data = await res.json();
+    picker.innerHTML = `<option value="">Select an event...</option>`;
+    data.events.forEach(ev=>{
+      const opt = document.createElement('option');
+      opt.value = ev.eventId;
+      opt.textContent = `${ev.eventName} — ${ev.client}`;
+      picker.appendChild(opt);
+    });
+  } catch(err){
+    picker.innerHTML = `<option value="">Could not load events</option>`;
+  }
+}
+
+document.getElementById('eventPicker').addEventListener('change', async function(){
+  const eventId = this.value;
+  const vPicker = document.getElementById('versionPicker');
+  if(!eventId){ vPicker.disabled=true; vPicker.innerHTML=`<option>—</option>`; document.getElementById('estimateForm').style.display='none'; return; }
+
+  const status = document.getElementById('editLoadStatus');
+  status.style.display='block'; status.className='status info'; status.textContent='Loading versions...';
+
+  try{
+    const res = await fetch(`${SCRIPT_URL}?action=listVersions&eventId=${encodeURIComponent(eventId)}`);
+    const data = await res.json();
+    vPicker.innerHTML = "";
+    data.versions.forEach(v=>{
+      const opt = document.createElement('option');
+      opt.value = v; opt.textContent = v;
+      vPicker.appendChild(opt);
+    });
+    vPicker.disabled = false;
+    // Auto-select latest (highest V number)
+    const latest = data.versions[data.versions.length-1];
+    vPicker.value = latest;
+    document.getElementById('latestTag').style.display='inline-block';
+    await loadVersion(eventId, latest);
+  } catch(err){
+    status.className='status err'; status.textContent='Could not load versions.';
+  }
+});
+
+document.getElementById('versionPicker').addEventListener('change', async function(){
+  const eventId = document.getElementById('eventPicker').value;
+  const version = this.value;
+  if(eventId && version) await loadVersion(eventId, version);
+});
+
+async function loadVersion(eventId, version){
+  const status = document.getElementById('editLoadStatus');
+  status.style.display='block'; status.className='status info'; status.textContent=`Loading ${version}...`;
+  try{
+    const res = await fetch(`${SCRIPT_URL}?action=getVersion&eventId=${encodeURIComponent(eventId)}&version=${encodeURIComponent(version)}`);
+    const data = await res.json();
+    applyLoadedData(data);
+    currentEventId = eventId; currentVersion = version;
+    document.getElementById('estimateForm').style.display='block';
+    document.getElementById('actionsEdit').style.display='flex';
+    document.getElementById('actionsNew').style.display='none';
+    status.className='status ok'; status.textContent = `Loaded ${version}. Edit and choose update mode below.`;
+  } catch(err){
+    status.className='status err'; status.textContent='Could not load this version.';
+  }
+}
+
+function applyLoadedData(data){
+  // header
+  document.getElementById('client').value = data.header.client || "";
+  document.getElementById('eventName').value = data.header.eventName || "";
+  document.getElementById('venue').value = data.header.venue || "";
+
+  // Reset days
+  days = []; dayCounter = 0;
+  document.getElementById('dayPanes').innerHTML = "";
+
+  // Rebuild days from data
+  (data.days||[{id:"day1",label:"Day 1",date:""}]).forEach(d=>{
+    dayCounter++;
+    const id = "day"+dayCounter;
+    days.push({ id, label: d.label, date: d.date });
+    buildDayPane(id);
+    if(d.date){
+      const di = document.querySelector(`.day-date[data-day="${id}"]`);
+      if(di) di.value = d.date;
+    }
+  });
+  renderDayTabs();
+  if(days.length>0) switchDay(days[0].id);
+
+  // Map old day IDs -> new IDs by index
+  const oldToNew = {};
+  (data.days||[]).forEach((d,i)=>{ if(days[i]) oldToNew[d.id] = days[i].id; });
+
+  // Fill line items
+  (data.lineItems||[]).forEach(li=>{
+    const newDayId = oldToNew[li.dayId] || days[0]?.id;
+    if(!newDayId) return;
+    const catIdx = CATEGORIES.findIndex(c=>c.name===li.category);
+
+    if(catIdx >= 0){
+      // Fixed category
+      if(li.isCustom){
+        const cat = CATEGORIES[catIdx];
+        const siIdx = cat.subs.findIndex(s => s.title === li.subSection);
+        if(siIdx < 0) return;
+        const table = document.querySelector(`table[data-day="${newDayId}"][data-cat="${catIdx}"][data-sub="${siIdx}"]`);
+        if(!table) return;
+        const tr = addItemRow(table.querySelector('tbody'), {
+          day:newDayId, ci:catIdx, si:siIdx, subtitle:li.subSection, catname:li.category, custom:true
+        });
+        fillRowFields(tr, li);
+      } else {
+        const rows = document.querySelectorAll(`tr[data-day="${newDayId}"][data-cat="${catIdx}"]`);
+        rows.forEach(tr=>{
+          if(tr.dataset.item === li.item && tr.dataset.subtitle === li.subSection && tr.dataset.custom !== "1"){
+            fillRowFields(tr, li);
+          }
+        });
+      }
+    } else {
+      // Custom category — find or create
+      const dayPane = document.getElementById(newDayId);
+      if(!dayPane) return;
+      const customCatsContainer = dayPane.querySelector('.custom-cats');
+      if(!customCatsContainer) return;
+
+      let catBox = Array.from(customCatsContainer.querySelectorAll('.category')).find(b =>
+        (b.querySelector('.cat-name-input')?.value || "") === li.category);
+      if(!catBox){
+        catBox = addCustomCategory(newDayId, customCatsContainer, li.category);
+      }
+      const subsBox = catBox.querySelector('.custom-subs');
+      let subBox = Array.from(subsBox.querySelectorAll('.subsection')).find(s =>
+        (s.querySelector('.sub-title-input')?.value || "") === li.subSection);
+      if(!subBox){
+        subBox = addCustomSubsection(newDayId, catBox, subsBox, li.subSection);
+      }
+      const tbody = subBox.querySelector('table tbody');
+      const tr = addItemRow(tbody, {
+        day:newDayId, ci:'cust', si:'cust',
+        subtitle:li.subSection, catname:li.category, custom:true
+      });
+      fillRowFields(tr, li);
+    }
+  });
+
+  // Logistics — clear & repopulate
+  const logTbody = document.querySelector('#logisticsTable tbody');
+  if(logTbody) logTbody.innerHTML = "";
+  (data.logistics||[]).forEach(lg=>{
+    addLogisticsRow({ vehicle:lg.vehicle, route:lg.route, qty:lg.qty, rate:lg.rate });
+  });
+
+  // Summary
+  if(data.summary){
+    document.getElementById('mgmtPct').value = data.summary.mgmtPct ?? 10;
+    document.getElementById('hotelCoord').value = data.summary.hotelCoord ?? 0;
+    document.getElementById('gstPct').value = data.summary.gstPct ?? 18;
+  }
+  recalc();
+}
+
+function fillRowFields(tr, li){
+  if(tr.querySelector('.f-itemname')) tr.querySelector('.f-itemname').value = li.item || "";
+  tr.querySelector('.f-desc').value = li.description || "";
+  tr.querySelector('.f-size').value = li.size || "";
+  tr.querySelector('.f-sqft').value = li.sqft || "";
+  tr.querySelector('.f-days').value = li.days || "";
+  tr.querySelector('.f-qty').value = li.qty || "";
+  tr.querySelector('.f-rate').value = li.rate || "";
+  const useEl = tr.querySelector('.f-usesqft');
+  if(useEl) useEl.checked = !!li.useSqft;
+}
+
+// ===================== INIT =====================
+buildLogistics();
+addDay("Day 1");
+['mgmtPct','hotelCoord','gstPct'].forEach(id=>document.getElementById(id).addEventListener('input', recalc));
+document.getElementById('actionsNew').style.display='flex';
+recalc();
+</script>
+
+</body>
+</html>
