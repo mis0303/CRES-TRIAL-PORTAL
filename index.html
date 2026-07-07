@@ -121,6 +121,15 @@
     width:100%; padding:6px 8px; font-size:13px; font-weight:600;
     border:1px dashed var(--gold); background:#fffceb;
   }
+
+  .delete-actions{display:flex !important; gap:10px; flex-wrap:wrap; margin-top:12px;}
+  .btn-delete{
+    padding:9px 14px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;
+    border:1px solid var(--err); background:white; color:var(--err);
+  }
+  .btn-delete:hover{background:#fbe9e7;}
+  .btn-delete-event{border-color:#800; color:#800;}
+  .btn-delete-event:hover{background:#f5dcdc;}
 </style>
 </head>
 <body>
@@ -148,6 +157,10 @@
         <label>Version <span class="version-tag" id="latestTag" style="display:none;">latest</span></label>
         <select id="versionPicker" disabled><option value="">—</option></select>
       </div>
+    </div>
+    <div class="delete-actions" id="deleteActions" style="display:none; margin-top:10px; display:none; gap:10px; flex-wrap:wrap;">
+      <button type="button" class="btn-delete btn-delete-version" onclick="confirmDeleteVersion()">🗑️ Delete This Version</button>
+      <button type="button" class="btn-delete btn-delete-event" onclick="confirmDeleteEvent()">⚠️ Delete Entire Event</button>
     </div>
     <div class="status info" id="editLoadStatus" style="display:none;"></div>
   </div>
@@ -338,6 +351,7 @@ function setMode(m){
   document.getElementById('estimateForm').style.display = m==='new' ? 'block' : 'none';
   document.getElementById('actionsNew').style.display = m==='new' ? 'flex' : 'none';
   document.getElementById('actionsEdit').style.display = 'none';
+  document.getElementById('deleteActions').style.display = 'none';
   resetForm();
   if(m==='new'){ days=[]; dayCounter=0; document.getElementById('dayPanes').innerHTML=""; addDay("Day 1"); }
   if(m==='edit'){ loadEventList(); }
@@ -926,9 +940,70 @@ async function loadVersion(eventId, version){
     document.getElementById('estimateForm').style.display='block';
     document.getElementById('actionsEdit').style.display='flex';
     document.getElementById('actionsNew').style.display='none';
+    document.getElementById('deleteActions').style.display='flex';
     status.className='status ok'; status.textContent = `Loaded ${version}. Edit and choose update mode below.`;
   } catch(err){
     status.className='status err'; status.textContent='Could not load this version.';
+  }
+}
+
+async function confirmDeleteVersion(){
+  if(!currentEventId || !currentVersion) return;
+  const eventName = document.getElementById('eventPicker').selectedOptions[0]?.textContent || 'this event';
+  const ok = window.confirm(`Are you sure you want to delete ${currentVersion} of "${eventName}"?\n\nThis action cannot be undone.`);
+  if(!ok) return;
+
+  const statusEl = document.getElementById('statusMsg');
+  statusEl.className="status info"; statusEl.textContent = `Deleting ${currentVersion}...`;
+
+  try{
+    const res = await fetch(SCRIPT_URL, {
+      method:"POST", mode:"cors",
+      headers:{"Content-Type":"text/plain"},
+      body: JSON.stringify({ action:"deleteVersion", eventId: currentEventId, version: currentVersion })
+    });
+    const data = await res.json();
+    if(data.status === "success"){
+      statusEl.className="status ok"; statusEl.textContent = `${currentVersion} deleted. Reloading...`;
+      // Reload version list — latest will auto-load
+      const picker = document.getElementById('eventPicker');
+      picker.dispatchEvent(new Event('change'));
+    } else {
+      statusEl.className="status err"; statusEl.textContent = "Error: " + (data.message||"unknown");
+    }
+  } catch(err){
+    statusEl.className="status err"; statusEl.textContent = "Network error: " + err.message;
+  }
+}
+
+async function confirmDeleteEvent(){
+  if(!currentEventId) return;
+  const eventName = document.getElementById('eventPicker').selectedOptions[0]?.textContent || 'this event';
+  const ok = window.confirm(`⚠️ Delete ENTIRE event "${eventName}"?\n\nThis will move the file to Drive Trash (30-day recovery window) and remove all versions from the portal.\n\nAre you sure?`);
+  if(!ok) return;
+
+  const statusEl = document.getElementById('statusMsg');
+  statusEl.className="status info"; statusEl.textContent = "Deleting event...";
+
+  try{
+    const res = await fetch(SCRIPT_URL, {
+      method:"POST", mode:"cors",
+      headers:{"Content-Type":"text/plain"},
+      body: JSON.stringify({ action:"deleteEvent", eventId: currentEventId })
+    });
+    const data = await res.json();
+    if(data.status === "success"){
+      statusEl.className="status ok"; statusEl.textContent = "Event moved to Drive Trash. Reloading list...";
+      // Reset picker + form
+      currentEventId = null; currentVersion = null;
+      document.getElementById('estimateForm').style.display='none';
+      document.getElementById('deleteActions').style.display='none';
+      loadEventList();
+    } else {
+      statusEl.className="status err"; statusEl.textContent = "Error: " + (data.message||"unknown");
+    }
+  } catch(err){
+    statusEl.className="status err"; statusEl.textContent = "Network error: " + err.message;
   }
 }
 
