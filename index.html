@@ -122,7 +122,7 @@
     border:1px dashed var(--gold); background:#fffceb;
   }
 
-  .delete-actions{display:flex !important; gap:10px; flex-wrap:wrap; margin-top:12px;}
+  .delete-actions{gap:10px; flex-wrap:wrap; margin-top:12px;}
   .btn-delete{
     padding:9px 14px; border-radius:6px; font-size:13px; font-weight:600; cursor:pointer;
     border:1px solid var(--err); background:white; color:var(--err);
@@ -158,7 +158,7 @@
         <select id="versionPicker" disabled><option value="">—</option></select>
       </div>
     </div>
-    <div class="delete-actions" id="deleteActions" style="display:none; margin-top:10px; display:none; gap:10px; flex-wrap:wrap;">
+    <div class="delete-actions" id="deleteActions" style="display:none;">
       <button type="button" class="btn-delete btn-delete-version" onclick="confirmDeleteVersion()">🗑️ Delete This Version</button>
       <button type="button" class="btn-delete btn-delete-event" onclick="confirmDeleteEvent()">⚠️ Delete Entire Event</button>
     </div>
