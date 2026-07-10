@@ -152,13 +152,51 @@
   .item-table .item-name{cursor:grab;}
   .sortable-ghost{opacity:0.4; background:#fff8e8;}
   .sortable-drag{opacity:0.85;}
+
+  /* Loading overlay */
+  #loadingOverlay{
+    position:fixed; inset:0; background:var(--paper);
+    display:flex; align-items:center; justify-content:center; flex-direction:column;
+    gap:14px; z-index:9999; transition:opacity 0.25s;
+  }
+  #loadingOverlay .spinner{
+    width:44px; height:44px; border:4px solid var(--gold-soft);
+    border-top-color:var(--navy); border-radius:50%;
+    animation: cres-spin 0.8s linear infinite;
+  }
+  #loadingOverlay .msg{
+    font-size:14px; font-weight:600; color:var(--navy); letter-spacing:0.3px;
+  }
+  #loadingOverlay.hide{opacity:0; pointer-events:none;}
+  @keyframes cres-spin{ to{ transform:rotate(360deg); } }
+
+  /* Reload button in topbar */
+  .topbar{display:flex; justify-content:space-between; align-items:center;}
+  .reload-btn{
+    background:transparent; border:1px solid var(--gold); color:var(--gold-soft);
+    padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12.5px; font-weight:600;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .reload-btn:hover{background:rgba(200,155,60,0.15); color:white;}
+  .reload-btn.spinning svg{animation: cres-spin 0.8s linear infinite;}
 </style>
 </head>
 <body>
 
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="msg" id="loadingMsg">Loading library...</div>
+</div>
+
 <div class="topbar">
-  <div class="mark">CRES Portal</div>
-  <div class="sub">Event Estimate — Internal Use Only</div>
+  <div>
+    <div class="mark">CRES Portal</div>
+    <div class="sub">Event Estimate — Internal Use Only</div>
+  </div>
+  <button type="button" class="reload-btn" id="reloadBtn" onclick="reloadLibrary()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+    Reload
+  </button>
 </div>
 
 <div class="container">
@@ -567,21 +605,22 @@ function computeSqftFromSize(sizeStr){
   var s = sizeStr.trim();
   if(!s) return null;
 
-  // Normalize separators: ×, X, x -> *, then strip letters (units like "ft")
-  // But keep +, -, *, /, ., (, )
-  var normalized = s
-    .replace(/×|X|x/g, '*')
-    .replace(/[a-zA-Z]+/g, '')  // strip units
-    .replace(/\s+/g, '')
-    .trim();
+  // Strip letters/units (e.g. "ft") and whitespace, keep math operators
+  var cleaned = s.replace(/[a-zA-Z]+/g, '').replace(/\s+/g, '');
+  if(!cleaned) return null;
 
-  // If contains + or -, treat as a compound math expression → evaluate safely
-  if(/[+\-]/.test(normalized)){
-    // Only allow digits, decimals, and math operators for safety
-    if(!/^[\d+\-*/.()]+$/.test(normalized)) return null;
+  // Rule:
+  //   Contains *, +, or - → evaluate as full math expression (jaisa likha waisa)
+  //   Otherwise (only x/X/× as separator) → treat as dimensions: first 2 numbers only
+  var hasMath = /[*+\-]/.test(cleaned);
+
+  if(hasMath){
+    // Normalize x/X/× to * for the evaluator (safety)
+    var expr = cleaned.replace(/[xX×]/g, '*');
+    // Only allow digits, decimals, and math operators/parens
+    if(!/^[\d+\-*/.()]+$/.test(expr)) return null;
     try{
-      // Function constructor is safer than direct eval; evaluate the arithmetic
-      var val = Function('"use strict"; return (' + normalized + ')')();
+      var val = Function('"use strict"; return (' + expr + ')')();
       if(typeof val === "number" && isFinite(val)){
         return Math.round(val * 100) / 100;
       }
@@ -589,8 +628,7 @@ function computeSqftFromSize(sizeStr){
     return null;
   }
 
-  // Otherwise: simple size like "12*8" or "44*18*2.5"
-  // Extract numbers from the ORIGINAL string (not normalized, so decimals stay intact)
+  // Dimensions mode: extract numbers, use first 2 only
   var matches = s.match(/\d+(\.\d+)?/g);
   if(!matches || matches.length < 2) return null;
   var nums = matches.map(parseFloat);
@@ -1345,15 +1383,62 @@ async function loadLibrary(){
   }
 }
 
+function showLoading(msg){
+  const ov = document.getElementById('loadingOverlay');
+  if(!ov) return;
+  document.getElementById('loadingMsg').textContent = msg || 'Loading...';
+  ov.classList.remove('hide');
+}
+function hideLoading(){
+  const ov = document.getElementById('loadingOverlay');
+  if(!ov) return;
+  ov.classList.add('hide');
+  setTimeout(() => { ov.style.display = 'none'; }, 300);
+}
+
+async function reloadLibrary(){
+  const btn = document.getElementById('reloadBtn');
+  if(btn) btn.classList.add('spinning');
+  showLoading('Refreshing library...');
+  try {
+    await loadLibrary();
+    // Rebuild all currently open day panes so new library reflects
+    const currentDays = days.map(d => ({ id: d.id, label: d.label, date: d.date }));
+    days = []; dayCounter = 0;
+    document.getElementById('dayPanes').innerHTML = "";
+    currentDays.forEach(d => {
+      dayCounter++;
+      const id = "day" + dayCounter;
+      days.push({ id, label: d.label, date: d.date });
+      buildDayPane(id);
+      if(d.date){
+        const di = document.querySelector(`.day-date[data-day="${id}"]`);
+        if(di) di.value = d.date;
+      }
+    });
+    renderDayTabs();
+    if(days.length > 0) switchDay(days[0].id);
+    recalc();
+  } catch(err){
+    console.warn('Reload failed:', err);
+    alert('Reload failed. Please check your connection.');
+  } finally {
+    if(btn) btn.classList.remove('spinning');
+    hideLoading();
+  }
+}
+
 (async function init(){
   if(window._cresInitDone) return;
   window._cresInitDone = true;
+  showLoading('Loading library...');
   await loadLibrary();
   buildLogistics();
   if(days.length === 0) addDay("Day 1");
   ['mgmtPct','hotelCoord','gstPct'].forEach(id=>document.getElementById(id).addEventListener('input', recalc));
   document.getElementById('actionsNew').style.display='flex';
   recalc();
+  hideLoading();
 })();
 </script>
 
