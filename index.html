@@ -426,6 +426,7 @@ function enableSortables(pane){
     filter: 'input, .row-remove, .pencil-edit, .chev',
     preventOnFilter: false,
     onEnd: () => {
+      renumberAllCategories(pane);
       syncLibraryOrder();
       recalc();
     }
@@ -693,6 +694,15 @@ function addCustomSubsection(dayId, catBox, container, presetTitle){
 
   container.appendChild(sd);
   return sd;
+}
+
+function renumberAllCategories(pane){
+  if(!pane) return;
+  const boxes = pane.querySelectorAll('.category');
+  boxes.forEach((box, i) => {
+    const numSpan = box.querySelector('.cat-num');
+    if(numSpan) numSpan.textContent = (i + 1) + '.';
+  });
 }
 
 function renumberCustomCategories(dayId){
@@ -1336,9 +1346,11 @@ async function loadLibrary(){
 }
 
 (async function init(){
+  if(window._cresInitDone) return;
+  window._cresInitDone = true;
   await loadLibrary();
   buildLogistics();
-  addDay("Day 1");
+  if(days.length === 0) addDay("Day 1");
   ['mgmtPct','hotelCoord','gstPct'].forEach(id=>document.getElementById(id).addEventListener('input', recalc));
   document.getElementById('actionsNew').style.display='flex';
   recalc();
