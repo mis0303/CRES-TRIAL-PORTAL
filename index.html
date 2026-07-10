@@ -7,6 +7,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#10243e">
 <link rel="apple-touch-icon" href="icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <style>
   :root{
     --navy:#10243e; --navy-deep:#0a1830; --gold:#c89b3c; --gold-soft:#e8d9b5;
@@ -55,7 +56,9 @@
 
   .subsection{margin-top:6px; padding:6px 4px 2px; border-top:1px dashed var(--line);}
   .subsection:first-child{border-top:none;}
-  .subsection-title{font-size:12.5px; font-weight:700; color:var(--gold); text-transform:uppercase; letter-spacing:0.6px; margin:6px 4px 8px;}
+  .subsection-title{font-size:12.5px; font-weight:700; color:var(--gold); text-transform:uppercase; letter-spacing:0.6px; margin:6px 4px 8px; display:flex; align-items:center; gap:6px;}
+  .subsection-title .sub-title-display{flex:0 0 auto;}
+  .subsection-title .sub-delete{margin-left:auto;}
 
   .item-table{width:100%; border-collapse:collapse; font-size:13.5px;}
   .item-table th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.4px; color:var(--muted); padding:7px 4px; border-bottom:1px solid var(--line); font-weight:600;}
@@ -65,7 +68,7 @@
   .item-table .amount-cell{font-size:13.5px; text-align:right; white-space:nowrap; color:var(--muted); font-weight:600;}
   .item-table tr.has-value{background:#fbf8f0;}
   .item-table tr.has-value .item-name, .item-table tr.has-value .amount-cell{color:var(--navy);}
-  .c-desc{width:18%;} .c-size{width:14%;} .c-sqft{width:7%;} .c-days{width:6%;} .c-qty{width:6%;} .c-rate{width:10%;} .c-amt{width:11%;}
+  .c-desc{width:16%;} .c-size{width:13%;} .c-sqft{width:10%;} .c-days{width:6%;} .c-qty{width:6%;} .c-rate{width:10%;} .c-amt{width:11%;}
 
   @media (max-width:760px){
     .item-table thead{display:none;}
@@ -121,6 +124,11 @@
     width:100%; padding:6px 8px; font-size:13px; font-weight:600;
     border:1px dashed var(--gold); background:#fffceb;
   }
+  .item-name-wrap{
+    display:flex; align-items:center; gap:6px;
+  }
+  .item-name-wrap input{flex:1; min-width:0;}
+  .item-name-wrap .row-remove{margin-left:auto;}
 
   .delete-actions{gap:10px; flex-wrap:wrap; margin-top:12px;}
   .btn-delete{
@@ -130,6 +138,20 @@
   .btn-delete:hover{background:#fbe9e7;}
   .btn-delete-event{border-color:#800; color:#800;}
   .btn-delete-event:hover{background:#f5dcdc;}
+
+  .pencil-edit{
+    display:inline-block; margin-left:8px; cursor:pointer; opacity:0.55;
+    font-size:13px; padding:1px 4px; border-radius:3px; transition:opacity 0.15s;
+  }
+  .pencil-edit:hover{opacity:1; background:rgba(200,155,60,0.15);}
+
+  /* Drag-and-drop hints */
+  .cat-header{cursor:grab;}
+  .cat-header:active{cursor:grabbing;}
+  .subsection-title{cursor:grab;}
+  .item-table .item-name{cursor:grab;}
+  .sortable-ghost{opacity:0.4; background:#fff8e8;}
+  .sortable-drag{opacity:0.85;}
 </style>
 </head>
 <body>
@@ -220,111 +242,7 @@
 // ===================== CONFIG =====================
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyvWJ1YGfYLeIIsAJ4zdDFG4uBODhbI-XJGpPgzbe3pe49dIUfpGduUUIu2zD2wAriB/exec";
 
-const CATEGORIES = [
-  { name: "Welcome (Hotel Registration)", subs: [
-    { title: "Branding", items: [
-      { name: "Registration Backdrop", size: "12ft w x 8ft h", sqft: 96 },
-      { name: "Registration Desk Facade", sqft: 42.5 },
-      { name: "Info Desk in Lobby", size: "8ft x 8ft" }
-    ]},
-    { title: "Manpower", items: [
-      { name: "Hostess" }, { name: "Volunteers" }
-    ]}
-  ]},
-  { name: "Artist & Entertainment", subs: [
-    { title: "Performances", items: [
-      { name: "Live Band / Base Band" }, { name: "DJ (Bollywood / English)" }
-    ]},
-    { title: "Permissions & Licenses", items: [
-      { name: "IPRS / PWD / Police intimation (Band)" },
-      { name: "PWD / IPRS / NOVEX / PPL (DJ)" },
-      { name: "Graphic Designer" }
-    ]}
-  ]},
-  { name: "Fabrication", subs: [
-    { title: "Main Entrance Gate Arch", items: [
-      { name: "Top with frame and flex" },
-      { name: "Pillars with frame and flex" },
-      { name: "Ballroom Entrance Arch" }
-    ]},
-    { title: "Stage", items: [
-      { name: "Platform for Stage", size: "44ft x 18ft x 2.5ft" },
-      { name: "Skirting for Stage" },
-      { name: "LED Riser", size: "32ft x 1ft" },
-      { name: "Skirting for LED Riser" },
-      { name: "Steps" },
-      { name: "Side Panel", size: "4ft x 12ft" },
-      { name: "Side View Cutter", size: "5ft x 11ft" },
-      { name: "Podium", size: "2ft x 4ft" },
-      { name: "Console with Black Masking" },
-      { name: "Camera Riser", size: "6ft x 4ft x 1.5ft" },
-      { name: "LED Side Riser", size: "12ft x 4ft x 4ft" }
-    ]},
-    { title: "Branding", items: [
-      { name: "Standees", size: "4ft x 6ft" },
-      { name: "Customized Photo Booth", size: "12ft x 10ft" }
-    ]}
-  ]},
-  { name: "Sound", subs: [
-    { title: "Equipment", items: [
-      { name: "Tops (JBL VRX)" }, { name: "Dual Base for Stage" },
-      { name: "Stage Monitors" }, { name: "Cordless Mics" },
-      { name: "Headset Mics" }, { name: "Podium Mics" },
-      { name: "Mixer / Pioneer Player" }, { name: "Cabling and Technicians" }
-    ]}
-  ]},
-  { name: "Lights", subs: [
-    { title: "Fixtures", items: [
-      { name: "LED Par Cans RGB" }, { name: "LED Par Cans Face Light" },
-      { name: "Sharpy" }, { name: "Moving LED Wash" },
-      { name: "Profile" }, { name: "Smoke" },
-      { name: "Light Technician & Operator" }
-    ]},
-    { title: "Structures", items: [
-      { name: "Front Goal Post", size: "60ft x 20ft" }
-    ]}
-  ]},
-  { name: "LED Wall (2.9)", subs: [
-    { title: "Screens", items: [
-      { name: "Main LED Wall", size: "36ft x 11.5ft" },
-      { name: "Side Screen", size: "12ft x 8ft" },
-      { name: "Comfort Plasma" }, { name: "Timer Plasma" }
-    ]},
-    { title: "Control", items: [
-      { name: "Switcher" }, { name: "Clicker" }, { name: "Laptops" },
-      { name: "Resolume Server" }, { name: "Operator" }, { name: "Watchout" }
-    ]}
-  ]},
-  { name: "Generator", subs: [
-    { title: "Power", items: [
-      { name: "Generator (125 KVA)" }, { name: "Cabling" }, { name: "Operator" }
-    ]}
-  ]},
-  { name: "Event Coverage", subs: [
-    { title: "Photo & Video", items: [
-      { name: "Photographer" },
-      { name: "Videographer (Wide Angle + Gimble)" },
-      { name: "Montage / Highlight Video" }
-    ]}
-  ]},
-  { name: "Activities", subs: [
-    { title: "Engagement Booths", items: [
-      { name: "360° Photo Booth" }, { name: "Instant Photo Strip" },
-      { name: "Word Cloud Selfie Booth" }
-    ]}
-  ]},
-  { name: "Communication", subs: [
-    { title: "Equipment", items: [ { name: "Clearcom / Walkies" } ]}
-  ]},
-  { name: "Misc & Transport", subs: [
-    { title: "Setup", items: [
-      { name: "Setup Transport (labour, mathadi, equipment)" },
-      { name: "Crew Food / Promoters / Hostess" },
-      { name: "Miscellaneous Expenses" },
-      { name: "TBL (team stay + food)" }
-    ]}
-  ]}
-];
+let CATEGORIES = []; // loaded from backend on init
 
 const LOGISTICS = [
   { vehicle: "Sedan", routes: ["Pune Airport to JW Marriott", "Mumbai to Pune"] },
@@ -432,7 +350,7 @@ function buildDayPane(id){
     box.className='category';
     box.innerHTML = `
       <div class="cat-header" onclick="this.parentElement.classList.toggle('open')">
-        <span><span class="cat-num">${ci+1}.</span> ${cat.name}</span>
+        <span><span class="cat-num">${ci+1}.</span> <span class="cat-name-display">${cat.name}</span><span class="pencil-edit" onclick="event.stopPropagation(); editCategoryName(this)" title="Rename category">✏️</span></span>
         <span class="right"><span class="cat-total">₹0</span><span class="chev">▶</span></span>
       </div>
       <div class="cat-body"></div>`;
@@ -441,7 +359,7 @@ function buildDayPane(id){
     cat.subs.forEach((sub,si)=>{
       const sd = document.createElement('div');
       sd.className='subsection';
-      sd.innerHTML = `<div class="subsection-title">${sub.title}</div>`;
+      sd.innerHTML = `<div class="subsection-title"><span class="sub-title-display">${sub.title}</span><span class="pencil-edit" onclick="editSubsectionName(this)" title="Rename sub-section">✏️</span><span class="row-remove sub-delete" onclick="deleteSubsection(this, '${cat.name.replace(/'/g,"\\'")}', '${sub.title.replace(/'/g,"\\'")}')" title="Delete sub-section">✕</span></div>`;
       const table = document.createElement('table');
       table.className='item-table';
       table.dataset.day=id; table.dataset.cat=ci; table.dataset.sub=si;
@@ -491,6 +409,112 @@ function buildDayPane(id){
   pane.appendChild(ds);
 
   document.getElementById('dayPanes').appendChild(pane);
+  enableSortables(pane);
+}
+
+function enableSortables(pane){
+  if(typeof Sortable === 'undefined') return;
+
+  // 1. Categories reorderable within the day pane (via drag handle on cat-header)
+  // Group all category boxes (fixed + custom-cats children) into a virtual list
+  // Simpler: make the pane itself the sortable container for direct .category children,
+  // AND the custom-cats container separately.
+  Sortable.create(pane, {
+    handle: '.cat-header',
+    draggable: '.category',
+    animation: 150,
+    filter: 'input, .row-remove, .pencil-edit, .chev',
+    preventOnFilter: false,
+    onEnd: () => {
+      syncLibraryOrder();
+      recalc();
+    }
+  });
+
+  // 2. Sub-sections reorderable within each category body
+  pane.querySelectorAll('.cat-body').forEach(body => {
+    Sortable.create(body, {
+      handle: '.subsection-title',
+      draggable: '.subsection',
+      animation: 150,
+      filter: 'input, .row-remove, .pencil-edit',
+      preventOnFilter: false,
+      onEnd: () => { syncLibraryOrder(); recalc(); }
+    });
+  });
+
+  // 3. Items reorderable within tbody (also allow cross-tbody moves)
+  pane.querySelectorAll('.item-table tbody').forEach(tbody => {
+    Sortable.create(tbody, {
+      group: 'cres-items',       // same group => cross-container drag works
+      handle: '.item-name',
+      draggable: 'tr',
+      animation: 150,
+      filter: 'input, .row-remove, .pencil-edit',
+      preventOnFilter: false,
+      onEnd: (evt) => {
+        // Update tr dataset if item moved into a different sub-section/category tbody
+        const newTbody = evt.to;
+        const parentTable = newTbody.closest('table');
+        const parentSub = newTbody.closest('.subsection');
+        const parentCat = newTbody.closest('.category');
+        const tr = evt.item;
+
+        if(parentCat){
+          const catNameEl = parentCat.querySelector('.cat-name-display') || parentCat.querySelector('.cat-name-input');
+          if(catNameEl){
+            const cname = catNameEl.tagName === 'INPUT' ? catNameEl.value : catNameEl.textContent.trim();
+            tr.dataset.catname = cname;
+          }
+        }
+        if(parentSub){
+          const subTitleEl = parentSub.querySelector('.sub-title-display') || parentSub.querySelector('.sub-title-input');
+          if(subTitleEl){
+            const sname = subTitleEl.tagName === 'INPUT' ? subTitleEl.value : subTitleEl.textContent.trim();
+            tr.dataset.subtitle = sname;
+          }
+        }
+        syncLibraryOrder();
+        recalc();
+      }
+    });
+  });
+}
+
+// Rebuild CATEGORIES from current DOM order and sync to backend
+function syncLibraryOrder(){
+  const dayPane = document.querySelector('.day-pane.active');
+  if(!dayPane) return;
+  const newLib = [];
+  dayPane.querySelectorAll('.category').forEach(box => {
+    const nameEl = box.querySelector('.cat-name-display') || box.querySelector('.cat-name-input');
+    if(!nameEl) return;
+    const catName = nameEl.tagName === 'INPUT' ? nameEl.value.trim() : nameEl.textContent.trim();
+    if(!catName) return;
+
+    const subs = [];
+    box.querySelectorAll('.subsection').forEach(subDiv => {
+      const titleEl = subDiv.querySelector('.sub-title-display') || subDiv.querySelector('.sub-title-input');
+      const subName = titleEl ? (titleEl.tagName === 'INPUT' ? titleEl.value.trim() : titleEl.textContent.trim()) : "";
+      const items = [];
+      subDiv.querySelectorAll('tbody tr').forEach(tr => {
+        if(tr.dataset.custom === "1") return; // skip custom rows from permanent library sync
+        const itemName = tr.dataset.item || (tr.querySelector('.item-name')?.childNodes[0]?.nodeValue || "").trim();
+        if(itemName) items.push({ name: itemName });
+      });
+      subs.push({ title: subName, items });
+    });
+    newLib.push({ name: catName, subs });
+  });
+
+  // Update in-memory CATEGORIES
+  CATEGORIES = newLib;
+
+  // Sync to backend (fire and forget)
+  fetch(SCRIPT_URL, {
+    method:"POST", mode:"cors", headers:{"Content-Type":"text/plain"},
+    body: JSON.stringify({ action: "reorderLibrary", library: newLib })
+  }).catch(err => console.warn("Reorder sync failed:", err));
 }
 
 function addItemRow(tbody, opts){
@@ -500,16 +524,13 @@ function addItemRow(tbody, opts){
   tr.dataset.custom = opts.custom ? "1" : "0";
   tr.dataset.item = opts.custom ? "" : (opts.item?.name || "");
 
-  const isFab = opts.catname === "Fabrication";
   const item = opts.item || {};
 
   const itemCell = opts.custom
-    ? `<td class="item-name" data-label="Item"><input type="text" class="f-itemname" placeholder="New item name" value="${item.name||''}"><span class="row-remove" onclick="this.closest('tr').remove(); recalc();" title="Remove">✕</span></td>`
-    : `<td class="item-name">${item.name||''}</td>`;
+    ? `<td class="item-name" data-label="Item"><div class="item-name-wrap"><input type="text" class="f-itemname" placeholder="New item name" value="${item.name||''}"><span class="row-remove" onclick="this.closest('tr').remove(); recalc();" title="Remove">✕</span></div></td>`
+    : `<td class="item-name">${item.name||''}<span class="pencil-edit" onclick="editItemName(this, '${(opts.catname||'').replace(/'/g,'\\\'')}', '${(opts.subtitle||'').replace(/'/g,'\\\'')}')" title="Rename permanently">✏️</span></td>`;
 
-  const sqftCell = isFab
-    ? `<td class="c-sqft" data-label="Sqft"><div class="sqft-wrap"><input type="checkbox" class="f-usesqft" title="Multiply Sqft in Amount"><input type="number" class="f-sqft" step="0.01"></div></td>`
-    : `<td class="c-sqft" data-label="Sqft"><input type="number" class="f-sqft" step="0.01"></td>`;
+  const sqftCell = `<td class="c-sqft" data-label="Sqft"><div class="sqft-wrap"><input type="checkbox" class="f-usesqft" title="Multiply Sqft in Amount"><input type="number" class="f-sqft" step="0.01"></div></td>`;
 
   tr.innerHTML = itemCell + `
     <td class="c-desc" data-label="Description"><input type="text" class="f-desc"></td>
@@ -522,7 +543,58 @@ function addItemRow(tbody, opts){
 
   tbody.appendChild(tr);
   tr.querySelectorAll('input').forEach(el => el.addEventListener('input', recalc));
+
+  // Auto-calc sqft from size when size changes
+  const sizeInp = tr.querySelector('.f-size');
+  const sqftInp = tr.querySelector('.f-sqft');
+  if(sizeInp && sqftInp){
+    sizeInp.addEventListener('blur', () => {
+      // Only autofill if sqft is currently empty (respect user manual override)
+      if(sqftInp.value !== "") return;
+      const computed = computeSqftFromSize(sizeInp.value);
+      if(computed !== null){
+        sqftInp.value = computed;
+        recalc();
+      }
+    });
+  }
   return tr;
+}
+
+function computeSqftFromSize(sizeStr){
+  if(!sizeStr) return null;
+  var s = sizeStr.trim();
+  if(!s) return null;
+
+  // Normalize separators: ×, X, x -> *, then strip letters (units like "ft")
+  // But keep +, -, *, /, ., (, )
+  var normalized = s
+    .replace(/×|X|x/g, '*')
+    .replace(/[a-zA-Z]+/g, '')  // strip units
+    .replace(/\s+/g, '')
+    .trim();
+
+  // If contains + or -, treat as a compound math expression → evaluate safely
+  if(/[+\-]/.test(normalized)){
+    // Only allow digits, decimals, and math operators for safety
+    if(!/^[\d+\-*/.()]+$/.test(normalized)) return null;
+    try{
+      // Function constructor is safer than direct eval; evaluate the arithmetic
+      var val = Function('"use strict"; return (' + normalized + ')')();
+      if(typeof val === "number" && isFinite(val)){
+        return Math.round(val * 100) / 100;
+      }
+    } catch(e){}
+    return null;
+  }
+
+  // Otherwise: simple size like "12*8" or "44*18*2.5"
+  // Extract numbers from the ORIGINAL string (not normalized, so decimals stay intact)
+  var matches = s.match(/\d+(\.\d+)?/g);
+  if(!matches || matches.length < 2) return null;
+  var nums = matches.map(parseFloat);
+  var sqft = nums[0] * nums[1];
+  return Math.round(sqft * 100) / 100;
 }
 
 function addCustomCategory(dayId, container, presetName){
@@ -537,6 +609,7 @@ function addCustomCategory(dayId, container, presetName){
       </span>
       <span class="right">
         <span class="cat-total">₹0</span>
+        <span class="chev">▶</span>
         <span class="row-remove" title="Remove category">✕</span>
       </span>
     </div>
@@ -1117,11 +1190,159 @@ function fillRowFields(tr, li){
 }
 
 // ===================== INIT =====================
-buildLogistics();
-addDay("Day 1");
-['mgmtPct','hotelCoord','gstPct'].forEach(id=>document.getElementById(id).addEventListener('input', recalc));
-document.getElementById('actionsNew').style.display='flex';
-recalc();
+async function editCategoryName(pencilEl){
+  const catBox = pencilEl.closest('.category');
+  const displaySpan = catBox.querySelector('.cat-name-display');
+  const oldName = displaySpan.textContent.trim();
+  const newName = window.prompt("Rename category (this will update permanently for all future events):", oldName);
+  if(!newName || newName.trim() === "" || newName === oldName) return;
+
+  displaySpan.textContent = newName;
+  // Update all rows in this category
+  catBox.querySelectorAll('tr').forEach(tr => tr.dataset.catname = newName);
+  // Update CATEGORIES model
+  const idx = CATEGORIES.findIndex(c => c.name === oldName);
+  if(idx >= 0) CATEGORIES[idx].name = newName;
+
+  // Send to backend
+  fetch(SCRIPT_URL, {
+    method:"POST", mode:"cors", headers:{"Content-Type":"text/plain"},
+    body: JSON.stringify({ action:"renameLibrary", level:"category", oldName, newName })
+  }).catch(err => console.warn("Rename sync failed:", err));
+}
+
+async function editSubsectionName(pencilEl){
+  const subDiv = pencilEl.closest('.subsection');
+  const catBox = pencilEl.closest('.category');
+  const catName = catBox.querySelector('.cat-name-display')?.textContent.trim() || "";
+  const displaySpan = subDiv.querySelector('.sub-title-display');
+  const oldName = displaySpan.textContent.trim();
+  const newName = window.prompt("Rename sub-section (this will update permanently):", oldName);
+  if(!newName || newName.trim() === "" || newName === oldName) return;
+
+  displaySpan.textContent = newName;
+  subDiv.querySelectorAll('tr').forEach(tr => tr.dataset.subtitle = newName);
+  // Update CATEGORIES model
+  const cat = CATEGORIES.find(c => c.name === catName);
+  if(cat){
+    const sub = cat.subs.find(s => s.title === oldName);
+    if(sub) sub.title = newName;
+  }
+
+  fetch(SCRIPT_URL, {
+    method:"POST", mode:"cors", headers:{"Content-Type":"text/plain"},
+    body: JSON.stringify({ action:"renameLibrary", level:"subsection", oldName, newName, scope:{ category: catName } })
+  }).catch(err => console.warn("Rename sync failed:", err));
+}
+
+function deleteSubsection(crossEl, catName, subTitle){
+  const choice = window.prompt(
+    `Delete sub-section "${subTitle}"?\n\n` +
+    `Type "1" to Keep the items (only remove sub-section header)\n` +
+    `Type "2" to Delete items too (remove sub-section + all items)\n` +
+    `Or leave blank / press Cancel to abort.`
+  );
+  if(!choice) return;
+  const trimmed = choice.trim();
+  const keepItems = trimmed === "1";
+  const deleteBoth = trimmed === "2";
+  if(!keepItems && !deleteBoth){
+    alert("Invalid choice. Sub-section not deleted.");
+    return;
+  }
+
+  const subDiv = crossEl.closest('.subsection');
+  if(!subDiv) return;
+
+  if(keepItems){
+    // Remove the title header only; move item rows/tables so they stay in category
+    const titleDiv = subDiv.querySelector('.subsection-title');
+    if(titleDiv) titleDiv.remove();
+    // Update dataset.subtitle for the remaining rows so they don't stay under the deleted name
+    subDiv.querySelectorAll('tr').forEach(tr => tr.dataset.subtitle = "");
+  } else {
+    subDiv.remove();
+  }
+
+  // Update CATEGORIES model
+  const cat = CATEGORIES.find(c => c.name === catName);
+  if(cat){
+    if(keepItems){
+      const sub = cat.subs.find(s => s.title === subTitle);
+      if(sub){
+        // Absorb items into a "loose" sub-section named "" or drop the sub-section entirely
+        cat.subs = cat.subs.filter(s => s.title !== subTitle);
+      }
+    } else {
+      cat.subs = cat.subs.filter(s => s.title !== subTitle);
+    }
+  }
+
+  // Sync backend permanently
+  fetch(SCRIPT_URL, {
+    method:"POST", mode:"cors", headers:{"Content-Type":"text/plain"},
+    body: JSON.stringify({
+      action:"deleteLibrarySubsection",
+      category: catName,
+      subSection: subTitle,
+      keepItems: keepItems
+    })
+  }).catch(err => console.warn("Delete sync failed:", err));
+
+  recalc();
+}
+
+async function editItemName(pencilEl, catName, subName){
+  const td = pencilEl.closest('.item-name');
+  const oldName = td.childNodes[0].nodeValue.trim();
+  const newName = window.prompt("Rename item (this will update permanently):", oldName);
+  if(!newName || newName.trim() === "" || newName === oldName) return;
+
+  td.childNodes[0].nodeValue = newName;
+  const tr = td.closest('tr');
+  if(tr) tr.dataset.item = newName;
+  // Update CATEGORIES model
+  const cat = CATEGORIES.find(c => c.name === catName);
+  if(cat){
+    const sub = cat.subs.find(s => s.title === subName);
+    if(sub){
+      const it = sub.items.find(i => i.name === oldName);
+      if(it) it.name = newName;
+    }
+  }
+
+  fetch(SCRIPT_URL, {
+    method:"POST", mode:"cors", headers:{"Content-Type":"text/plain"},
+    body: JSON.stringify({ action:"renameLibrary", level:"item", oldName, newName, scope:{ category:catName, subSection:subName } })
+  }).catch(err => console.warn("Rename sync failed:", err));
+}
+
+// ===================== INIT =====================
+async function loadLibrary(){
+  try{
+    const res = await fetch(`${SCRIPT_URL}?action=getLibrary`);
+    const data = await res.json();
+    CATEGORIES = (data.categories || []).map(c => ({
+      name: c.name,
+      subs: (c.subs || []).map(s => ({
+        title: s.title,
+        items: (s.items || []).map(i => ({ name: i.name || i }))
+      }))
+    }));
+  } catch(err){
+    console.warn("Failed to load library:", err);
+    CATEGORIES = [];
+  }
+}
+
+(async function init(){
+  await loadLibrary();
+  buildLogistics();
+  addDay("Day 1");
+  ['mgmtPct','hotelCoord','gstPct'].forEach(id=>document.getElementById(id).addEventListener('input', recalc));
+  document.getElementById('actionsNew').style.display='flex';
+  recalc();
+})();
 </script>
 
 </body>
