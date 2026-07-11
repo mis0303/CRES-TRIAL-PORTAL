@@ -905,7 +905,8 @@ function collectPayload(){
       const rate = tr.querySelector('.f-rate')?.value || "";
       const useSqftEl = tr.querySelector('.f-usesqft');
       const useSqft = useSqftEl ? useSqftEl.checked : false;
-      if((qty || rate) && itemName){
+      const hasAnyValue = (desc || size || sqft || dys || qty || rate);
+      if(hasAnyValue && itemName){
         const eDays = (parseFloat(dys)||0)===0 ? 1 : parseFloat(dys);
         const sMult = (useSqft && (parseFloat(sqft)||0) > 0) ? parseFloat(sqft) : 1;
         const amt = eDays * (parseFloat(qty)||0) * (parseFloat(rate)||0) * sMult;
