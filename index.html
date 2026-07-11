@@ -1399,12 +1399,15 @@ async function reloadLibrary(){
   if(btn) btn.classList.add('spinning');
   showLoading('Refreshing library...');
   try {
+    // Snapshot current form state before we wipe day panes
+    const snapshot = collectPayload();
+
     await loadLibrary();
-    // Rebuild all currently open day panes so new library reflects
-    const currentDays = days.map(d => ({ id: d.id, label: d.label, date: d.date }));
+
+    // Rebuild day panes so any new/renamed library items reflect
     days = []; dayCounter = 0;
     document.getElementById('dayPanes').innerHTML = "";
-    currentDays.forEach(d => {
+    (snapshot.days || [{ id: "day1", label: "Day 1", date: "" }]).forEach(d => {
       dayCounter++;
       const id = "day" + dayCounter;
       days.push({ id, label: d.label, date: d.date });
@@ -1416,6 +1419,61 @@ async function reloadLibrary(){
     });
     renderDayTabs();
     if(days.length > 0) switchDay(days[0].id);
+
+    // Restore filled line items into the freshly built panes
+    const oldToNew = {};
+    (snapshot.days || []).forEach((d, i) => { if(days[i]) oldToNew[d.id] = days[i].id; });
+
+    (snapshot.lineItems || []).forEach(li => {
+      const newDayId = oldToNew[li.dayId] || days[0]?.id;
+      if(!newDayId) return;
+      const catIdx = CATEGORIES.findIndex(c => c.name === li.category);
+
+      if(catIdx >= 0){
+        if(li.isCustom){
+          const cat = CATEGORIES[catIdx];
+          const siIdx = cat.subs.findIndex(s => s.title === li.subSection);
+          if(siIdx < 0) return;
+          const table = document.querySelector(`table[data-day="${newDayId}"][data-cat="${catIdx}"][data-sub="${siIdx}"]`);
+          if(!table) return;
+          const tr = addItemRow(table.querySelector('tbody'), {
+            day:newDayId, ci:catIdx, si:siIdx, subtitle:li.subSection, catname:li.category, custom:true
+          });
+          fillRowFields(tr, li);
+        } else {
+          const rows = document.querySelectorAll(`tr[data-day="${newDayId}"][data-cat="${catIdx}"]`);
+          rows.forEach(tr => {
+            if(tr.dataset.item === li.item && tr.dataset.subtitle === li.subSection && tr.dataset.custom !== "1"){
+              fillRowFields(tr, li);
+            }
+          });
+        }
+      } else {
+        // Custom category
+        const dayPane = document.getElementById(newDayId);
+        if(!dayPane) return;
+        const customCatsContainer = dayPane.querySelector('.custom-cats');
+        if(!customCatsContainer) return;
+        let catBox = Array.from(customCatsContainer.querySelectorAll('.category')).find(b =>
+          (b.querySelector('.cat-name-input')?.value || "") === li.category);
+        if(!catBox){
+          catBox = addCustomCategory(newDayId, customCatsContainer, li.category);
+        }
+        const subsBox = catBox.querySelector('.custom-subs');
+        let subBox = Array.from(subsBox.querySelectorAll('.subsection')).find(s =>
+          (s.querySelector('.sub-title-input')?.value || "") === li.subSection);
+        if(!subBox){
+          subBox = addCustomSubsection(newDayId, catBox, subsBox, li.subSection);
+        }
+        const tbody = subBox.querySelector('table tbody');
+        const tr = addItemRow(tbody, {
+          day:newDayId, ci:'cust', si:'cust',
+          subtitle:li.subSection, catname:li.category, custom:true
+        });
+        fillRowFields(tr, li);
+      }
+    });
+
     recalc();
   } catch(err){
     console.warn('Reload failed:', err);
@@ -1442,5 +1500,3 @@ async function reloadLibrary(){
 
 </body>
 </html>
-
-
