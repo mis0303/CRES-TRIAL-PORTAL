@@ -588,8 +588,6 @@ function addItemRow(tbody, opts){
   const sqftInp = tr.querySelector('.f-sqft');
   if(sizeInp && sqftInp){
     sizeInp.addEventListener('blur', () => {
-      // Only autofill if sqft is currently empty (respect user manual override)
-      if(sqftInp.value !== "") return;
       const computed = computeSqftFromSize(sizeInp.value);
       if(computed !== null){
         sqftInp.value = computed;
