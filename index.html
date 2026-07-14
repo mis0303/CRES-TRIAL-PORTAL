@@ -56,9 +56,14 @@
 
   .subsection{margin-top:6px; padding:6px 4px 2px; border-top:1px dashed var(--line);}
   .subsection:first-child{border-top:none;}
-  .subsection-title{font-size:12.5px; font-weight:700; color:var(--gold); text-transform:uppercase; letter-spacing:0.6px; margin:6px 4px 8px; display:flex; align-items:center; gap:6px;}
+  .subsection-title{font-size:12.5px; font-weight:700; color:var(--gold); text-transform:uppercase; letter-spacing:0.6px; margin:6px 4px 8px; display:flex; align-items:center; gap:6px; cursor:pointer;}
   .subsection-title .sub-title-display{flex:0 0 auto;}
-  .subsection-title .sub-delete{margin-left:auto;}
+  .subsection-title .sub-chev{font-size:10px; color:var(--muted); transition:transform 0.15s;}
+  .subsection.open .sub-chev{transform:rotate(90deg);}
+  .subsection .item-table,
+  .subsection .add-item-btn{display:none;}
+  .subsection.open .item-table{display:table;}
+  .subsection.open .add-item-btn{display:inline-block;}
 
   .item-table{width:100%; border-collapse:collapse; font-size:13.5px;}
   .item-table th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.4px; color:var(--muted); padding:7px 4px; border-bottom:1px solid var(--line); font-weight:600;}
@@ -396,8 +401,13 @@ function buildDayPane(id){
 
     cat.subs.forEach((sub,si)=>{
       const sd = document.createElement('div');
-      sd.className='subsection';
-      sd.innerHTML = `<div class="subsection-title"><span class="sub-title-display">${sub.title}</span><span class="pencil-edit" onclick="editSubsectionName(this)" title="Rename sub-section">✏️</span><span class="row-remove sub-delete" onclick="deleteSubsection(this, '${cat.name.replace(/'/g,"\\'")}', '${sub.title.replace(/'/g,"\\'")}')" title="Delete sub-section">✕</span></div>`;
+      sd.className='subsection open';
+      sd.innerHTML = `<div class="subsection-title"><span class="sub-chev">▶</span><span class="sub-title-display">${sub.title}</span><span class="pencil-edit" onclick="event.stopPropagation(); editSubsectionName(this)" title="Rename sub-section">✏️</span></div>`;
+      const titleDiv = sd.querySelector('.subsection-title');
+      titleDiv.addEventListener('click', (e) => {
+        if(e.target.tagName === 'INPUT' || e.target.classList.contains('pencil-edit') || e.target.classList.contains('row-remove')) return;
+        sd.classList.toggle('open');
+      });
       const table = document.createElement('table');
       table.className='item-table';
       table.dataset.day=id; table.dataset.cat=ci; table.dataset.sub=si;
@@ -470,15 +480,47 @@ function enableSortables(pane){
     }
   });
 
-  // 2. Sub-sections reorderable within each category body
+  // 2. Sub-sections reorderable + can cross to other categories
   pane.querySelectorAll('.cat-body').forEach(body => {
     Sortable.create(body, {
+      group: 'cres-subsections',
       handle: '.subsection-title',
       draggable: '.subsection',
       animation: 150,
-      filter: 'input, .row-remove, .pencil-edit',
+      filter: 'input, .row-remove, .pencil-edit, .sub-chev',
       preventOnFilter: false,
-      onEnd: () => { syncLibraryOrder(); recalc(); }
+      onEnd: (evt) => {
+        const dragged = evt.item;
+        const draggedTitle = (dragged.querySelector('.sub-title-display')?.textContent
+                              || dragged.querySelector('.sub-title-input')?.value || "").trim();
+        const targetCatBody = evt.to;
+        const targetCat = targetCatBody.closest('.category');
+        const targetCatName = targetCat
+          ? (targetCat.querySelector('.cat-name-display')?.textContent || targetCat.querySelector('.cat-name-input')?.value || "").trim()
+          : "";
+
+        // Check for clash in target category (excluding the dragged one)
+        const clash = Array.from(targetCatBody.querySelectorAll('.subsection')).some(sd => {
+          if(sd === dragged) return false;
+          const t = (sd.querySelector('.sub-title-display')?.textContent
+                     || sd.querySelector('.sub-title-input')?.value || "").trim();
+          return t && t === draggedTitle;
+        });
+
+        if(clash && evt.from !== evt.to){
+          alert(`"${draggedTitle}" already exists in "${targetCatName}". Move cancelled.`);
+          // Move back to original position
+          evt.from.insertBefore(dragged, evt.from.children[evt.oldIndex] || null);
+          recalc();
+          return;
+        }
+
+        // Success: update dataset.catname on all rows inside moved sub-section
+        if(targetCat){
+          dragged.querySelectorAll('tr').forEach(tr => tr.dataset.catname = targetCatName);
+        }
+        recalc();
+      }
     });
   });
 
@@ -686,12 +728,18 @@ function addCustomCategory(dayId, container, presetName){
 
 function addCustomSubsection(dayId, catBox, container, presetTitle){
   const sd = document.createElement('div');
-  sd.className = 'subsection';
+  sd.className = 'subsection open';
   sd.innerHTML = `
     <div class="subsection-title" style="display:flex; align-items:center; gap:8px;">
+      <span class="sub-chev">▶</span>
       <input type="text" class="sub-title-input" placeholder="Sub-section title" value="${presetTitle||''}" style="padding:5px 8px; font-size:12.5px; font-weight:700; border:1px dashed var(--gold); background:#fffceb; color:var(--gold); text-transform:uppercase; letter-spacing:0.5px; flex:1; max-width:300px;">
-      <span class="row-remove" title="Remove sub-section">✕</span>
     </div>`;
+  const titleDiv = sd.querySelector('.subsection-title');
+  titleDiv.addEventListener('click', (e) => {
+    if(e.target.tagName === 'INPUT' || e.target.classList.contains('pencil-edit') || e.target.classList.contains('row-remove')) return;
+    sd.classList.toggle('open');
+  });
+
   const table = document.createElement('table');
   table.className = 'item-table';
   table.innerHTML = `<thead><tr>
@@ -722,11 +770,6 @@ function addCustomSubsection(dayId, catBox, container, presetTitle){
   subTitleEl.addEventListener('input', () => {
     table.querySelectorAll('tr').forEach(tr => tr.dataset.subtitle = subTitleEl.value);
   });
-
-  sd.querySelector('.row-remove').onclick = () => {
-    sd.remove();
-    recalc();
-  };
 
   container.appendChild(sd);
   return sd;
