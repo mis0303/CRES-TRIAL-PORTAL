@@ -65,6 +65,10 @@
   .subsection.open .item-table{display:table;}
   .subsection.open .add-item-btn{display:inline-block;}
 
+  /* Logistics category (special) */
+  .logistics-cat .cat-header{border-left-color:#7a5b1c;}
+  .logistics-cat .cat-header .cat-name-display{color:#7a5b1c;}
+
   .item-table{width:100%; border-collapse:collapse; font-size:13.5px;}
   .item-table th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.4px; color:var(--muted); padding:7px 4px; border-bottom:1px solid var(--line); font-weight:600;}
   .item-table td{padding:6px 4px; border-bottom:1px solid #f0eada; vertical-align:middle;}
@@ -246,23 +250,17 @@
     <div class="day-tabs" id="dayTabs"></div>
     <div id="dayPanes"></div>
 
-    <!-- LOGISTICS -->
-    <div class="form-card">
-      <h3>Logistics (Transport)</h3>
-      <div id="logisticsBody"></div>
-      <div class="day-summary"><span>Logistics Total</span><span id="logisticsTotal">₹0</span></div>
-    </div>
-
     <!-- SUMMARY -->
     <div class="summary-card">
       <h3>Estimate Summary</h3>
       <div id="daySummaries"></div>
-      <div class="sum-row"><span>Logistics</span><span id="sumLogistics">₹0</span></div>
       <div class="sum-row" style="font-weight:700; color:var(--navy);"><span>Subtotal</span><span id="sumSubtotal">₹0</span></div>
       <div class="sum-row"><span>Management Fee <input type="number" class="sum-input" id="mgmtPct" value="10" min="0" max="100" step="0.5">%</span><span id="sumMgmt">₹0</span></div>
       <div class="sum-row"><span>Hotel Coordination Charges</span><span>₹ <input type="number" class="sum-input" id="hotelCoord" value="0" min="0" step="1000"></span></div>
-      <div class="sum-row" style="font-weight:700;"><span>Sub Total before GST</span><span id="sumPreGst">₹0</span></div>
-      <div class="sum-row"><span>GST <input type="number" class="sum-input" id="gstPct" value="18" min="0" max="100" step="0.5">%</span><span id="sumGst">₹0</span></div>
+      <div class="sum-row" style="font-weight:700;"><span>Sub Total before Tax</span><span id="sumPreGst">₹0</span></div>
+      <div class="sum-row"><span>IGST <input type="number" class="sum-input" id="igstPct" value="18" min="0" max="100" step="0.5">%</span><span id="sumIgst">₹0</span></div>
+      <div class="sum-row"><span>SGST <input type="number" class="sum-input" id="sgstPct" value="9" min="0" max="100" step="0.5">%</span><span id="sumSgst">₹0</span></div>
+      <div class="sum-row"><span>CGST <input type="number" class="sum-input" id="cgstPct" value="9" min="0" max="100" step="0.5">%</span><span id="sumCgst">₹0</span></div>
       <div class="sum-row grand"><span>Grand Total</span><span id="sumGrand">₹0</span></div>
 
       <div class="actions" id="actionsNew" style="display:none;">
@@ -324,7 +322,9 @@ function resetForm(){
   document.getElementById('venue').value="";
   document.getElementById('mgmtPct').value=10;
   document.getElementById('hotelCoord').value=0;
-  document.getElementById('gstPct').value=18;
+  document.getElementById('igstPct').value=18;
+  document.getElementById('sgstPct').value=9;
+  document.getElementById('cgstPct').value=9;
   currentEventId=null; currentVersion=null; currentEventName=null;
 }
 
@@ -399,7 +399,13 @@ function buildDayPane(id){
       <div class="cat-body"></div>`;
     const body = box.querySelector('.cat-body');
 
-    cat.subs.forEach((sub,si)=>{
+    // Split subs: named sub-sections first, blank ("direct items") last
+    const namedSubs = cat.subs.filter(s => s.title && s.title.trim() !== "");
+    const directSubs = cat.subs.filter(s => !s.title || s.title.trim() === "");
+
+    // Render named sub-sections
+    namedSubs.forEach((sub, siNamed) => {
+      const si = cat.subs.indexOf(sub); // original index for data-attrs
       const sd = document.createElement('div');
       sd.className='subsection open';
       sd.innerHTML = `<div class="subsection-title"><span class="sub-chev">▶</span><span class="sub-title-display">${sub.title}</span><span class="pencil-edit" onclick="event.stopPropagation(); editSubsectionName(this)" title="Rename sub-section">✏️</span></div>`;
@@ -433,8 +439,66 @@ function buildDayPane(id){
       sd.appendChild(addBtn);
       body.appendChild(sd);
     });
+
+    // Render direct items table (from blank-sub items)
+    let directTable = null;
+    let directTbody = null;
+    const ensureDirectTable = () => {
+      if(directTable) return directTable;
+      directTable = document.createElement('table');
+      directTable.className='item-table direct-items-table';
+      directTable.dataset.day=id; directTable.dataset.cat=ci; directTable.dataset.sub='direct';
+      directTable.innerHTML = `<thead><tr>
+        <th>Item</th><th class="c-desc">Description</th><th class="c-size">Size</th>
+        <th class="c-sqft">Sqft</th><th class="c-days">Days</th>
+        <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th>
+      </tr></thead><tbody></tbody>`;
+      directTbody = directTable.querySelector('tbody');
+      body.appendChild(directTable);
+      return directTable;
+    };
+
+    directSubs.forEach(sub => {
+      if(!sub.items || sub.items.length === 0) return;
+      ensureDirectTable();
+      sub.items.forEach(item => {
+        addItemRow(directTbody, { day:id, ci, si:'direct', subtitle:"", catname:cat.name, item, custom:false });
+      });
+    });
+
+    // Both Add buttons at category level (per-event only)
+    const btnRow = document.createElement('div');
+    btnRow.className = 'cat-add-btns';
+    btnRow.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;';
+
+    const addSubBtn = document.createElement('button');
+    addSubBtn.type = 'button';
+    addSubBtn.className = 'add-item-btn add-sub-btn';
+    addSubBtn.textContent = '+ Add Sub-section';
+    addSubBtn.onclick = () => {
+      const sd = addCustomSubsectionInline(id, cat.name, body);
+      const inp = sd.querySelector('.sub-title-input'); if(inp) inp.focus();
+    };
+    btnRow.appendChild(addSubBtn);
+
+    const addDirectBtn = document.createElement('button');
+    addDirectBtn.type = 'button';
+    addDirectBtn.className = 'add-item-btn add-direct-item-btn';
+    addDirectBtn.textContent = '+ Add Item';
+    addDirectBtn.onclick = () => {
+      ensureDirectTable();
+      const tr = addItemRow(directTbody, { day:id, ci, si:'direct', subtitle:"", catname:cat.name, custom:true });
+      const inp = tr.querySelector('.f-itemname'); if(inp) inp.focus();
+    };
+    btnRow.appendChild(addDirectBtn);
+
+    body.appendChild(btnRow);
+
     pane.appendChild(box);
   });
+
+  // ===== LOGISTICS category (special) =====
+  pane.appendChild(buildLogisticsCategory(id, CATEGORIES.length + 1));
 
   const customCatsBox = document.createElement('div');
   customCatsBox.className = 'custom-cats';
@@ -469,13 +533,12 @@ function enableSortables(pane){
   // AND the custom-cats container separately.
   Sortable.create(pane, {
     handle: '.cat-header',
-    draggable: '.category',
+    draggable: '.category:not(.logistics-cat)',
     animation: 150,
     filter: 'input, .row-remove, .pencil-edit, .chev',
     preventOnFilter: false,
     onEnd: () => {
       renumberAllCategories(pane);
-      syncLibraryOrder();
       recalc();
     }
   });
@@ -526,6 +589,8 @@ function enableSortables(pane){
 
   // 3. Items reorderable within tbody (also allow cross-tbody moves)
   pane.querySelectorAll('.item-table tbody').forEach(tbody => {
+    // Skip logistics table (columns differ)
+    if(tbody.closest('.logistics-table')) return;
     Sortable.create(tbody, {
       group: 'cres-items',       // same group => cross-container drag works
       handle: '.item-name',
@@ -562,41 +627,8 @@ function enableSortables(pane){
   });
 }
 
-// Rebuild CATEGORIES from current DOM order and sync to backend
-function syncLibraryOrder(){
-  const dayPane = document.querySelector('.day-pane.active');
-  if(!dayPane) return;
-  const newLib = [];
-  dayPane.querySelectorAll('.category').forEach(box => {
-    const nameEl = box.querySelector('.cat-name-display') || box.querySelector('.cat-name-input');
-    if(!nameEl) return;
-    const catName = nameEl.tagName === 'INPUT' ? nameEl.value.trim() : nameEl.textContent.trim();
-    if(!catName) return;
-
-    const subs = [];
-    box.querySelectorAll('.subsection').forEach(subDiv => {
-      const titleEl = subDiv.querySelector('.sub-title-display') || subDiv.querySelector('.sub-title-input');
-      const subName = titleEl ? (titleEl.tagName === 'INPUT' ? titleEl.value.trim() : titleEl.textContent.trim()) : "";
-      const items = [];
-      subDiv.querySelectorAll('tbody tr').forEach(tr => {
-        if(tr.dataset.custom === "1") return; // skip custom rows from permanent library sync
-        const itemName = tr.dataset.item || (tr.querySelector('.item-name')?.childNodes[0]?.nodeValue || "").trim();
-        if(itemName) items.push({ name: itemName });
-      });
-      subs.push({ title: subName, items });
-    });
-    newLib.push({ name: catName, subs });
-  });
-
-  // Update in-memory CATEGORIES
-  CATEGORIES = newLib;
-
-  // Sync to backend (fire and forget)
-  fetch(SCRIPT_URL, {
-    method:"POST", mode:"cors", headers:{"Content-Type":"text/plain"},
-    body: JSON.stringify({ action: "reorderLibrary", library: newLib })
-  }).catch(err => console.warn("Reorder sync failed:", err));
-}
+// No-op: reordering is per-event only, does not sync to backend Library
+function syncLibraryOrder(){}
 
 function addItemRow(tbody, opts){
   const tr = document.createElement('tr');
@@ -694,7 +726,11 @@ function addCustomCategory(dayId, container, presetName){
     </div>
     <div class="cat-body">
       <div class="custom-subs"></div>
-      <button type="button" class="add-item-btn add-sub-btn">+ Add Sub-section</button>
+      <div class="custom-direct-items"></div>
+      <div class="cat-mode-buttons" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+        <button type="button" class="add-item-btn add-sub-btn">+ Add Sub-section</button>
+        <button type="button" class="add-item-btn add-direct-item-btn">+ Add Item</button>
+      </div>
     </div>`;
   container.appendChild(box);
   renumberCustomCategories(dayId);
@@ -712,9 +748,61 @@ function addCustomCategory(dayId, container, presetName){
   };
 
   const subsBox = box.querySelector('.custom-subs');
-  box.querySelector('.add-sub-btn').onclick = () => {
+  const directBox = box.querySelector('.custom-direct-items');
+  const modeButtons = box.querySelector('.cat-mode-buttons');
+  const subBtn = box.querySelector('.add-sub-btn');
+  const directBtn = box.querySelector('.add-direct-item-btn');
+
+  // Mode tracker: 'none' | 'subs' | 'direct'
+  const getMode = () => {
+    if(subsBox.querySelector('.subsection')) return 'subs';
+    if(directBox.querySelector('table tbody tr')) return 'direct';
+    return 'none';
+  };
+  const refreshModeButtons = () => {
+    const m = getMode();
+    if(m === 'none'){
+      subBtn.style.display = ''; directBtn.style.display = '';
+    } else if(m === 'subs'){
+      subBtn.style.display = ''; directBtn.style.display = 'none';
+    } else {
+      subBtn.style.display = 'none'; directBtn.style.display = '';
+    }
+  };
+
+  // Direct-items table (created lazily on first click)
+  let directTable = null;
+  const ensureDirectTable = () => {
+    if(directTable) return directTable;
+    directTable = document.createElement('table');
+    directTable.className = 'item-table';
+    directTable.innerHTML = `<thead><tr>
+      <th>Item</th><th class="c-desc">Description</th><th class="c-size">Size</th>
+      <th class="c-sqft">Sqft</th><th class="c-days">Days</th>
+      <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th>
+    </tr></thead><tbody></tbody>`;
+    directBox.appendChild(directTable);
+    // Observer: when rows removed and empty, refresh mode
+    new MutationObserver(refreshModeButtons).observe(directTable.querySelector('tbody'), { childList: true });
+    return directTable;
+  };
+
+  subBtn.onclick = () => {
     const sd = addCustomSubsection(dayId, box, subsBox);
     const inp = sd.querySelector('.sub-title-input'); if(inp) inp.focus();
+    refreshModeButtons();
+    new MutationObserver(refreshModeButtons).observe(subsBox, { childList: true });
+  };
+  directBtn.onclick = () => {
+    const tbl = ensureDirectTable();
+    const tr = addItemRow(tbl.querySelector('tbody'), {
+      day: dayId, ci: 'cust', si: 'cust',
+      subtitle: "",
+      catname: nameInput.value || 'Untitled',
+      custom: true
+    });
+    const inp = tr.querySelector('.f-itemname'); if(inp) inp.focus();
+    refreshModeButtons();
   };
 
   // Toggle open/close on header click, but not when interacting with inputs/remove
@@ -723,6 +811,10 @@ function addCustomCategory(dayId, container, presetName){
     box.classList.toggle('open');
   });
 
+  // Watch subsBox for children removal (when all subs deleted -> reset mode)
+  new MutationObserver(refreshModeButtons).observe(subsBox, { childList: true });
+
+  refreshModeButtons();
   return box;
 }
 
@@ -775,6 +867,62 @@ function addCustomSubsection(dayId, catBox, container, presetTitle){
   return sd;
 }
 
+function addCustomSubsectionInline(dayId, catName, catBody, presetTitle){
+  const sd = document.createElement('div');
+  sd.className = 'subsection open';
+  sd.dataset.custom = "1";
+  sd.innerHTML = `
+    <div class="subsection-title" style="display:flex; align-items:center; gap:8px;">
+      <span class="sub-chev">▶</span>
+      <input type="text" class="sub-title-input" placeholder="Sub-section title" value="${presetTitle||''}" style="padding:5px 8px; font-size:12.5px; font-weight:700; border:1px dashed var(--gold); background:#fffceb; color:var(--gold); text-transform:uppercase; letter-spacing:0.5px; flex:1; max-width:300px;">
+      <span class="row-remove" title="Remove sub-section" style="margin-left:auto;">✕</span>
+    </div>`;
+  const titleDiv = sd.querySelector('.subsection-title');
+  titleDiv.addEventListener('click', (e) => {
+    if(e.target.tagName === 'INPUT' || e.target.classList.contains('row-remove')) return;
+    sd.classList.toggle('open');
+  });
+
+  const table = document.createElement('table');
+  table.className = 'item-table';
+  table.innerHTML = `<thead><tr>
+    <th>Item</th><th class="c-desc">Description</th><th class="c-size">Size</th>
+    <th class="c-sqft">Sqft</th><th class="c-days">Days</th>
+    <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th>
+  </tr></thead><tbody></tbody>`;
+  sd.appendChild(table);
+
+  const addItemBtn = document.createElement('button');
+  addItemBtn.type='button'; addItemBtn.className='add-item-btn';
+  addItemBtn.textContent='+ Add Item';
+  sd.appendChild(addItemBtn);
+
+  const subTitleEl = sd.querySelector('.sub-title-input');
+  addItemBtn.onclick = () => {
+    const tr = addItemRow(table.querySelector('tbody'), {
+      day: dayId, ci: 'cust', si: 'cust',
+      subtitle: subTitleEl.value || 'Untitled',
+      catname: catName,
+      custom: true
+    });
+    const inp = tr.querySelector('.f-itemname'); if(inp) inp.focus();
+  };
+  subTitleEl.addEventListener('input', () => {
+    table.querySelectorAll('tr').forEach(tr => tr.dataset.subtitle = subTitleEl.value);
+  });
+  sd.querySelector('.row-remove').onclick = () => {
+    sd.remove();
+    recalc();
+  };
+
+  // Insert BEFORE the button row
+  const btnRow = catBody.querySelector('.cat-add-btns');
+  if(btnRow) catBody.insertBefore(sd, btnRow);
+  else catBody.appendChild(sd);
+
+  return sd;
+}
+
 function renumberAllCategories(pane){
   if(!pane) return;
   const boxes = pane.querySelectorAll('.category');
@@ -805,33 +953,46 @@ function updateDayDate(id,val){
   const d = days.find(x=>x.id===id); if(d) d.date = val;
 }
 
-// ===================== LOGISTICS =====================
-function buildLogistics(){
-  const box = document.getElementById('logisticsBody');
-  box.innerHTML = "";
-  const table = document.createElement('table');
-  table.className='item-table'; table.id='logisticsTable';
-  table.innerHTML = `<thead><tr>
-    <th>Vehicle</th><th>Route</th>
-    <th class="c-qty">Qty</th><th class="c-rate">Rate</th>
-    <th class="c-amt">Amount</th><th style="width:30px;"></th>
-  </tr></thead><tbody></tbody>`;
-  box.appendChild(table);
+// ===================== LOGISTICS (category-styled) =====================
+function buildLogisticsCategory(dayId, catNum){
+  const box = document.createElement('div');
+  box.className = 'category logistics-cat open';
+  box.dataset.logisticsCat = "1";
+  box.dataset.day = dayId;
+  box.innerHTML = `
+    <div class="cat-header">
+      <span><span class="cat-num">${catNum}.</span> <span class="cat-name-display">Logistics</span></span>
+      <span class="right"><span class="cat-total">₹0</span><span class="chev">▶</span></span>
+    </div>
+    <div class="cat-body">
+      <table class="item-table logistics-table">
+        <thead><tr>
+          <th>Vehicle</th><th>Route</th>
+          <th class="c-qty">Qty</th><th class="c-rate">Rate</th>
+          <th class="c-amt">Amount</th><th style="width:30px;"></th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+      <button type="button" class="add-item-btn add-log-btn">+ Add Logistics Row</button>
+    </div>`;
 
-  const addBtn = document.createElement('button');
-  addBtn.type='button'; addBtn.className='add-item-btn';
-  addBtn.textContent = '+ Add Logistics Row';
-  addBtn.onclick = () => {
-    const tr = addLogisticsRow();
+  box.querySelector('.cat-header').addEventListener('click', (e) => {
+    if(e.target.tagName === 'INPUT') return;
+    box.classList.toggle('open');
+  });
+
+  const tbody = box.querySelector('tbody');
+  box.querySelector('.add-log-btn').onclick = () => {
+    const tr = addLogisticsRowInto(tbody);
     const inp = tr.querySelector('.f-vehicle'); if(inp) inp.focus();
   };
-  box.appendChild(addBtn);
+
+  return box;
 }
 
-function addLogisticsRow(data){
-  const tbody = document.querySelector('#logisticsTable tbody');
+function addLogisticsRowInto(tbody, data){
   const tr = document.createElement('tr');
-  tr.dataset.log="1";
+  tr.dataset.log = "1";
   tr.innerHTML = `
     <td class="item-name" data-label="Vehicle"><input type="text" class="f-vehicle" placeholder="e.g. Sedan" value="${data?.vehicle||''}"></td>
     <td data-label="Route"><input type="text" class="f-route" placeholder="e.g. Pune Airport to JW" value="${data?.route||''}"></td>
@@ -842,6 +1003,17 @@ function addLogisticsRow(data){
   tbody.appendChild(tr);
   tr.querySelectorAll('input').forEach(el=>el.addEventListener('input', recalc));
   return tr;
+}
+
+// Kept for backward compat but no-op now
+function buildLogistics(){}
+function addLogisticsRow(data){
+  // Route into the current active day's Logistics category
+  const activeP = document.querySelector('.day-pane.active') || document.querySelector('.day-pane');
+  if(!activeP) return null;
+  const logCat = activeP.querySelector('.logistics-cat');
+  if(!logCat) return null;
+  return addLogisticsRowInto(logCat.querySelector('tbody'), data);
 }
 
 // ===================== CALC =====================
@@ -893,35 +1065,30 @@ function recalc(){
     summaries.push(`<div class="sum-row"><span>${d.label}</span><span>${fmt(dayTotal)}</span></div>`);
   });
 
-  let logTotal = 0;
-  document.querySelectorAll('tr[data-log="1"]').forEach(tr=>{
-    const vehicle = tr.querySelector('.f-vehicle')?.value || "";
-    const qty = parseFloat(tr.querySelector('.f-qty').value) || 0;
-    const rate = parseFloat(tr.querySelector('.f-rate').value) || 0;
-    const amt = qty * rate;
-    const cell = tr.querySelector('.amount-cell');
-    if(qty>0 || rate>0 || vehicle){ tr.classList.add('has-value'); cell.textContent = amt>0 ? fmt(amt) : '—'; }
-    else { tr.classList.remove('has-value'); cell.textContent = '—'; }
-    logTotal += amt;
-  });
-  document.getElementById('logisticsTotal').textContent = fmt(logTotal);
-  document.getElementById('sumLogistics').textContent = fmt(logTotal);
-  subtotal += logTotal;
+  // Logistics category rows are now inside day panes and already counted in dayTotal.
+  // Keep this loop for safety in case old templates still have data-log rows outside panes.
 
   document.getElementById('daySummaries').innerHTML = summaries.join('');
   document.getElementById('sumSubtotal').textContent = fmt(subtotal);
 
   const mgmtPct = parseFloat(document.getElementById('mgmtPct').value) || 0;
   const hotel = parseFloat(document.getElementById('hotelCoord').value) || 0;
-  const gstPct = parseFloat(document.getElementById('gstPct').value) || 0;
+  const igstPct = parseFloat(document.getElementById('igstPct').value) || 0;
+  const sgstPct = parseFloat(document.getElementById('sgstPct').value) || 0;
+  const cgstPct = parseFloat(document.getElementById('cgstPct').value) || 0;
+
   const mgmt = subtotal * mgmtPct/100;
   const pre = subtotal + mgmt + hotel;
-  const gst = pre * gstPct/100;
-  const grand = pre + gst;
+  const igst = pre * igstPct/100;
+  const sgst = pre * sgstPct/100;
+  const cgst = pre * cgstPct/100;
+  const grand = pre + igst + sgst + cgst;
 
   document.getElementById('sumMgmt').textContent = fmt(mgmt);
   document.getElementById('sumPreGst').textContent = fmt(pre);
-  document.getElementById('sumGst').textContent = fmt(gst);
+  document.getElementById('sumIgst').textContent = fmt(igst);
+  document.getElementById('sumSgst').textContent = fmt(sgst);
+  document.getElementById('sumCgst').textContent = fmt(cgst);
   document.getElementById('sumGrand').textContent = fmt(grand);
 }
 
@@ -970,7 +1137,7 @@ function collectPayload(){
     const route = (tr.querySelector('.f-route')?.value || "").trim();
     const qty = tr.querySelector('.f-qty').value;
     const rate = tr.querySelector('.f-rate').value;
-    if((qty || rate) && (vehicle || route)){
+    if(vehicle || route || qty || rate){
       logistics.push({
         vehicle: vehicle, route: route,
         qty: parseFloat(qty)||0, rate: parseFloat(rate)||0,
@@ -989,7 +1156,9 @@ function collectPayload(){
     summary: {
       mgmtPct: parseFloat(document.getElementById('mgmtPct').value)||0,
       hotelCoord: parseFloat(document.getElementById('hotelCoord').value)||0,
-      gstPct: parseFloat(document.getElementById('gstPct').value)||0
+      igstPct: parseFloat(document.getElementById('igstPct').value)||0,
+      sgstPct: parseFloat(document.getElementById('sgstPct').value)||0,
+      cgstPct: parseFloat(document.getElementById('cgstPct').value)||0
     }
   };
 }
@@ -1251,18 +1420,32 @@ function applyLoadedData(data){
     }
   });
 
-  // Logistics — clear & repopulate
-  const logTbody = document.querySelector('#logisticsTable tbody');
-  if(logTbody) logTbody.innerHTML = "";
-  (data.logistics||[]).forEach(lg=>{
-    addLogisticsRow({ vehicle:lg.vehicle, route:lg.route, qty:lg.qty, rate:lg.rate });
-  });
+  // Logistics — clear & repopulate into logistics-cat of first day pane
+  const firstPane = document.querySelector('.day-pane');
+  if(firstPane){
+    const logCat = firstPane.querySelector('.logistics-cat');
+    if(logCat){
+      const logTbody = logCat.querySelector('tbody');
+      if(logTbody) logTbody.innerHTML = "";
+      (data.logistics||[]).forEach(lg=>{
+        addLogisticsRowInto(logTbody, { vehicle:lg.vehicle, route:lg.route, qty:lg.qty, rate:lg.rate });
+      });
+    }
+  }
 
   // Summary
   if(data.summary){
     document.getElementById('mgmtPct').value = data.summary.mgmtPct ?? 10;
     document.getElementById('hotelCoord').value = data.summary.hotelCoord ?? 0;
-    document.getElementById('gstPct').value = data.summary.gstPct ?? 18;
+    document.getElementById('igstPct').value = data.summary.igstPct ?? 18;
+    document.getElementById('sgstPct').value = data.summary.sgstPct ?? 9;
+    document.getElementById('cgstPct').value = data.summary.cgstPct ?? 9;
+    // Backward compat: if old data has gstPct only, put it in IGST
+    if(data.summary.gstPct !== undefined && data.summary.igstPct === undefined){
+      document.getElementById('igstPct').value = data.summary.gstPct;
+      document.getElementById('sgstPct').value = 0;
+      document.getElementById('cgstPct').value = 0;
+    }
   }
   recalc();
 }
@@ -1284,45 +1467,25 @@ async function editCategoryName(pencilEl){
   const catBox = pencilEl.closest('.category');
   const displaySpan = catBox.querySelector('.cat-name-display');
   const oldName = displaySpan.textContent.trim();
-  const newName = window.prompt("Rename category (this will update permanently for all future events):", oldName);
+  const newName = window.prompt("Rename category (this event only):", oldName);
   if(!newName || newName.trim() === "" || newName === oldName) return;
 
   displaySpan.textContent = newName;
-  // Update all rows in this category
   catBox.querySelectorAll('tr').forEach(tr => tr.dataset.catname = newName);
-  // Update CATEGORIES model
-  const idx = CATEGORIES.findIndex(c => c.name === oldName);
-  if(idx >= 0) CATEGORIES[idx].name = newName;
-
-  // Send to backend
-  fetch(SCRIPT_URL, {
-    method:"POST", mode:"cors", headers:{"Content-Type":"text/plain"},
-    body: JSON.stringify({ action:"renameLibrary", level:"category", oldName, newName })
-  }).catch(err => console.warn("Rename sync failed:", err));
+  // Note: backend Library is NOT updated — rename is per-event only.
+  // To permanently rename, edit the Library tab in Google Sheet directly.
 }
 
 async function editSubsectionName(pencilEl){
   const subDiv = pencilEl.closest('.subsection');
-  const catBox = pencilEl.closest('.category');
-  const catName = catBox.querySelector('.cat-name-display')?.textContent.trim() || "";
   const displaySpan = subDiv.querySelector('.sub-title-display');
   const oldName = displaySpan.textContent.trim();
-  const newName = window.prompt("Rename sub-section (this will update permanently):", oldName);
+  const newName = window.prompt("Rename sub-section (this event only):", oldName);
   if(!newName || newName.trim() === "" || newName === oldName) return;
 
   displaySpan.textContent = newName;
   subDiv.querySelectorAll('tr').forEach(tr => tr.dataset.subtitle = newName);
-  // Update CATEGORIES model
-  const cat = CATEGORIES.find(c => c.name === catName);
-  if(cat){
-    const sub = cat.subs.find(s => s.title === oldName);
-    if(sub) sub.title = newName;
-  }
-
-  fetch(SCRIPT_URL, {
-    method:"POST", mode:"cors", headers:{"Content-Type":"text/plain"},
-    body: JSON.stringify({ action:"renameLibrary", level:"subsection", oldName, newName, scope:{ category: catName } })
-  }).catch(err => console.warn("Rename sync failed:", err));
+  // Note: backend Library is NOT updated — rename is per-event only.
 }
 
 function deleteSubsection(crossEl, catName, subTitle){
@@ -1368,43 +1531,20 @@ function deleteSubsection(crossEl, catName, subTitle){
     }
   }
 
-  // Sync backend permanently
-  fetch(SCRIPT_URL, {
-    method:"POST", mode:"cors", headers:{"Content-Type":"text/plain"},
-    body: JSON.stringify({
-      action:"deleteLibrarySubsection",
-      category: catName,
-      subSection: subTitle,
-      keepItems: keepItems
-    })
-  }).catch(err => console.warn("Delete sync failed:", err));
-
+  // Note: backend Library is NOT updated — delete is per-event only.
   recalc();
 }
 
 async function editItemName(pencilEl, catName, subName){
   const td = pencilEl.closest('.item-name');
   const oldName = td.childNodes[0].nodeValue.trim();
-  const newName = window.prompt("Rename item (this will update permanently):", oldName);
+  const newName = window.prompt("Rename item (this event only):", oldName);
   if(!newName || newName.trim() === "" || newName === oldName) return;
 
   td.childNodes[0].nodeValue = newName;
   const tr = td.closest('tr');
   if(tr) tr.dataset.item = newName;
-  // Update CATEGORIES model
-  const cat = CATEGORIES.find(c => c.name === catName);
-  if(cat){
-    const sub = cat.subs.find(s => s.title === subName);
-    if(sub){
-      const it = sub.items.find(i => i.name === oldName);
-      if(it) it.name = newName;
-    }
-  }
-
-  fetch(SCRIPT_URL, {
-    method:"POST", mode:"cors", headers:{"Content-Type":"text/plain"},
-    body: JSON.stringify({ action:"renameLibrary", level:"item", oldName, newName, scope:{ category:catName, subSection:subName } })
-  }).catch(err => console.warn("Rename sync failed:", err));
+  // Note: backend Library is NOT updated — rename is per-event only.
 }
 
 // ===================== INIT =====================
@@ -1412,10 +1552,14 @@ async function loadLibrary(){
   try{
     const res = await fetch(`${SCRIPT_URL}?action=getLibrary`);
     const data = await res.json();
+    const capFirst = (s) => {
+      if(!s) return s;
+      return s.charAt(0).toUpperCase() + s.slice(1);
+    };
     CATEGORIES = (data.categories || []).map(c => ({
-      name: c.name,
+      name: capFirst(c.name),
       subs: (c.subs || []).map(s => ({
-        title: s.title,
+        title: capFirst(s.title),
         items: (s.items || []).map(i => ({ name: i.name || i }))
       }))
     }));
@@ -1476,6 +1620,16 @@ async function reloadLibrary(){
       if(catIdx >= 0){
         if(li.isCustom){
           const cat = CATEGORIES[catIdx];
+          // Direct item (blank sub-section) — route to direct-items table
+          if(!li.subSection || li.subSection.trim() === ""){
+            const directTable = document.querySelector(`table[data-day="${newDayId}"][data-cat="${catIdx}"][data-sub="direct"]`);
+            if(!directTable) return;
+            const tr = addItemRow(directTable.querySelector('tbody'), {
+              day:newDayId, ci:catIdx, si:'direct', subtitle:"", catname:li.category, custom:true
+            });
+            fillRowFields(tr, li);
+            return;
+          }
           const siIdx = cat.subs.findIndex(s => s.title === li.subSection);
           if(siIdx < 0) return;
           const table = document.querySelector(`table[data-day="${newDayId}"][data-cat="${catIdx}"][data-sub="${siIdx}"]`);
@@ -1487,7 +1641,7 @@ async function reloadLibrary(){
         } else {
           const rows = document.querySelectorAll(`tr[data-day="${newDayId}"][data-cat="${catIdx}"]`);
           rows.forEach(tr => {
-            if(tr.dataset.item === li.item && tr.dataset.subtitle === li.subSection && tr.dataset.custom !== "1"){
+            if(tr.dataset.item === li.item && (tr.dataset.subtitle||"") === (li.subSection||"") && tr.dataset.custom !== "1"){
               fillRowFields(tr, li);
             }
           });
@@ -1518,6 +1672,17 @@ async function reloadLibrary(){
       }
     });
 
+    // Restore logistics rows into Day 1's logistics-cat
+    const firstPane = document.querySelector('.day-pane');
+    if(firstPane){
+      const logCat = firstPane.querySelector('.logistics-cat');
+      if(logCat){
+        (snapshot.logistics || []).forEach(lg => {
+          addLogisticsRowInto(logCat.querySelector('tbody'), lg);
+        });
+      }
+    }
+
     recalc();
   } catch(err){
     console.warn('Reload failed:', err);
@@ -1535,7 +1700,7 @@ async function reloadLibrary(){
   await loadLibrary();
   buildLogistics();
   if(days.length === 0) addDay("Day 1");
-  ['mgmtPct','hotelCoord','gstPct'].forEach(id=>document.getElementById(id).addEventListener('input', recalc));
+  ['mgmtPct','hotelCoord','igstPct','sgstPct','cgstPct'].forEach(id=>document.getElementById(id).addEventListener('input', recalc));
   document.getElementById('actionsNew').style.display='flex';
   recalc();
   hideLoading();
