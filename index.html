@@ -59,6 +59,11 @@
   .subsection-title{font-size:12.5px; font-weight:700; color:var(--gold); text-transform:uppercase; letter-spacing:0.6px; margin:6px 4px 8px; display:flex; align-items:center; gap:6px; cursor:pointer;}
   .subsection-title .sub-title-display{flex:0 0 auto;}
   .subsection-title .sub-chev{font-size:10px; color:var(--muted); transition:transform 0.15s;}
+  .subsection-title .drag-handle{
+    cursor:grab; color:var(--muted); font-weight:900; font-size:14px;
+    padding:0 3px; user-select:none; letter-spacing:-2px;
+  }
+  .subsection-title .drag-handle:active{cursor:grabbing;}
   .subsection.open .sub-chev{transform:rotate(90deg);}
   .subsection .item-table,
   .subsection .add-item-btn{display:none;}
@@ -408,7 +413,7 @@ function buildDayPane(id){
       const si = cat.subs.indexOf(sub); // original index for data-attrs
       const sd = document.createElement('div');
       sd.className='subsection open';
-      sd.innerHTML = `<div class="subsection-title"><span class="sub-chev">▶</span><span class="sub-title-display">${sub.title}</span><span class="pencil-edit" onclick="event.stopPropagation(); editSubsectionName(this)" title="Rename sub-section">✏️</span></div>`;
+      sd.innerHTML = `<div class="subsection-title"><span class="drag-handle" title="Drag to reorder">⋮⋮</span><span class="sub-chev">▶</span><span class="sub-title-display">${sub.title}</span><span class="pencil-edit" onclick="event.stopPropagation(); editSubsectionName(this)" title="Rename sub-section">✏️</span></div>`;
       const titleDiv = sd.querySelector('.subsection-title');
       titleDiv.addEventListener('click', (e) => {
         if(e.target.tagName === 'INPUT' || e.target.classList.contains('pencil-edit') || e.target.classList.contains('row-remove')) return;
@@ -467,15 +472,15 @@ function buildDayPane(id){
     });
 
     // Add buttons at category level (per-event only)
-    // Rule: if category already has named sub-sections, only show "+ Add Item"
-    //       otherwise show both "+ Add Sub-section" AND "+ Add Item"
-    const btnRow = document.createElement('div');
-    btnRow.className = 'cat-add-btns';
-    btnRow.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;';
-
+    // Rule: only show buttons if category has NO named sub-sections
+    //       (with sub-sections, users add items via sub-section's own + Add Item)
     const hasNamedSubs = namedSubs.length > 0;
 
     if(!hasNamedSubs){
+      const btnRow = document.createElement('div');
+      btnRow.className = 'cat-add-btns';
+      btnRow.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;';
+
       const addSubBtn = document.createElement('button');
       addSubBtn.type = 'button';
       addSubBtn.className = 'add-item-btn add-sub-btn';
@@ -485,20 +490,20 @@ function buildDayPane(id){
         const inp = sd.querySelector('.sub-title-input'); if(inp) inp.focus();
       };
       btnRow.appendChild(addSubBtn);
+
+      const addDirectBtn = document.createElement('button');
+      addDirectBtn.type = 'button';
+      addDirectBtn.className = 'add-item-btn add-direct-item-btn';
+      addDirectBtn.textContent = '+ Add Item';
+      addDirectBtn.onclick = () => {
+        ensureDirectTable();
+        const tr = addItemRow(directTbody, { day:id, ci, si:'direct', subtitle:"", catname:cat.name, custom:true });
+        const inp = tr.querySelector('.f-itemname'); if(inp) inp.focus();
+      };
+      btnRow.appendChild(addDirectBtn);
+
+      body.appendChild(btnRow);
     }
-
-    const addDirectBtn = document.createElement('button');
-    addDirectBtn.type = 'button';
-    addDirectBtn.className = 'add-item-btn add-direct-item-btn';
-    addDirectBtn.textContent = '+ Add Item';
-    addDirectBtn.onclick = () => {
-      ensureDirectTable();
-      const tr = addItemRow(directTbody, { day:id, ci, si:'direct', subtitle:"", catname:cat.name, custom:true });
-      const inp = tr.querySelector('.f-itemname'); if(inp) inp.focus();
-    };
-    btnRow.appendChild(addDirectBtn);
-
-    body.appendChild(btnRow);
 
     pane.appendChild(box);
 
@@ -558,7 +563,7 @@ function enableSortables(pane){
   pane.querySelectorAll('.cat-body').forEach(body => {
     Sortable.create(body, {
       group: 'cres-subsections',
-      handle: '.subsection-title',
+      handle: '.drag-handle',
       draggable: '.subsection',
       animation: 150,
       filter: 'input, .row-remove, .pencil-edit, .sub-chev',
@@ -834,6 +839,7 @@ function addCustomSubsection(dayId, catBox, container, presetTitle){
   sd.className = 'subsection open';
   sd.innerHTML = `
     <div class="subsection-title" style="display:flex; align-items:center; gap:8px;">
+      <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
       <span class="sub-chev">▶</span>
       <input type="text" class="sub-title-input" placeholder="Sub-section title" value="${presetTitle||''}" style="padding:5px 8px; font-size:12.5px; font-weight:700; border:1px dashed var(--gold); background:#fffceb; color:var(--gold); text-transform:uppercase; letter-spacing:0.5px; flex:1; max-width:300px;">
     </div>`;
@@ -884,6 +890,7 @@ function addCustomSubsectionInline(dayId, catName, catBody, presetTitle){
   sd.dataset.custom = "1";
   sd.innerHTML = `
     <div class="subsection-title" style="display:flex; align-items:center; gap:8px;">
+      <span class="drag-handle" title="Drag to reorder">⋮⋮</span>
       <span class="sub-chev">▶</span>
       <input type="text" class="sub-title-input" placeholder="Sub-section title" value="${presetTitle||''}" style="padding:5px 8px; font-size:12.5px; font-weight:700; border:1px dashed var(--gold); background:#fffceb; color:var(--gold); text-transform:uppercase; letter-spacing:0.5px; flex:1; max-width:300px;">
       <span class="row-remove" title="Remove sub-section" style="margin-left:auto;">✕</span>
@@ -1715,7 +1722,35 @@ async function reloadLibrary(){
   document.getElementById('actionsNew').style.display='flex';
   recalc();
   hideLoading();
+
+  // Warn on tab close if form has any content
+  window.addEventListener('beforeunload', (e) => {
+    if(hasUnsavedContent()){
+      e.preventDefault();
+      e.returnValue = '';
+      return '';
+    }
+  });
 })();
+
+function hasUnsavedContent(){
+  // Header fields
+  const client = (document.getElementById('client')?.value || "").trim();
+  const eventName = (document.getElementById('eventName')?.value || "").trim();
+  const venue = (document.getElementById('venue')?.value || "").trim();
+  if(client || eventName || venue) return true;
+
+  // Any line item with values
+  const inputs = document.querySelectorAll(
+    '.day-pane input.f-qty, .day-pane input.f-rate, .day-pane input.f-days, ' +
+    '.day-pane input.f-sqft, .day-pane input.f-desc, .day-pane input.f-size, ' +
+    '.day-pane input.f-vehicle, .day-pane input.f-route, .day-pane input.f-itemname'
+  );
+  for(const inp of inputs){
+    if((inp.value || "").trim() !== "") return true;
+  }
+  return false;
+}
 </script>
 
 </body>
