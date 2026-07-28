@@ -466,20 +466,26 @@ function buildDayPane(id){
       });
     });
 
-    // Both Add buttons at category level (per-event only)
+    // Add buttons at category level (per-event only)
+    // Rule: if category already has named sub-sections, only show "+ Add Item"
+    //       otherwise show both "+ Add Sub-section" AND "+ Add Item"
     const btnRow = document.createElement('div');
     btnRow.className = 'cat-add-btns';
     btnRow.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;';
 
-    const addSubBtn = document.createElement('button');
-    addSubBtn.type = 'button';
-    addSubBtn.className = 'add-item-btn add-sub-btn';
-    addSubBtn.textContent = '+ Add Sub-section';
-    addSubBtn.onclick = () => {
-      const sd = addCustomSubsectionInline(id, cat.name, body);
-      const inp = sd.querySelector('.sub-title-input'); if(inp) inp.focus();
-    };
-    btnRow.appendChild(addSubBtn);
+    const hasNamedSubs = namedSubs.length > 0;
+
+    if(!hasNamedSubs){
+      const addSubBtn = document.createElement('button');
+      addSubBtn.type = 'button';
+      addSubBtn.className = 'add-item-btn add-sub-btn';
+      addSubBtn.textContent = '+ Add Sub-section';
+      addSubBtn.onclick = () => {
+        const sd = addCustomSubsectionInline(id, cat.name, body);
+        const inp = sd.querySelector('.sub-title-input'); if(inp) inp.focus();
+      };
+      btnRow.appendChild(addSubBtn);
+    }
 
     const addDirectBtn = document.createElement('button');
     addDirectBtn.type = 'button';
@@ -495,10 +501,15 @@ function buildDayPane(id){
     body.appendChild(btnRow);
 
     pane.appendChild(box);
+
+    // Insert Logistics category right after the first (Venues) → 2nd position
+    if(ci === 0){
+      pane.appendChild(buildLogisticsCategory(id, 2));
+    }
   });
 
-  // ===== LOGISTICS category (special) =====
-  pane.appendChild(buildLogisticsCategory(id, CATEGORIES.length + 1));
+  // Renumber all categories (needed because Logistics is inserted at position 2)
+  renumberAllCategories(pane);
 
   const customCatsBox = document.createElement('div');
   customCatsBox.className = 'custom-cats';
@@ -1560,7 +1571,7 @@ async function loadLibrary(){
       name: capFirst(c.name),
       subs: (c.subs || []).map(s => ({
         title: capFirst(s.title),
-        items: (s.items || []).map(i => ({ name: i.name || i }))
+        items: (s.items || []).map(i => ({ name: capFirst(i.name || i) }))
       }))
     }));
   } catch(err){
