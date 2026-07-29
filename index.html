@@ -444,6 +444,8 @@ function buildDayPane(id){
     // Render direct items table (from blank-sub items)
     let directTable = null;
     let directTbody = null;
+    let directAddBtn = null;
+
     const ensureDirectTable = () => {
       if(directTable) return directTable;
       directTable = document.createElement('table');
@@ -455,7 +457,9 @@ function buildDayPane(id){
         <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th>
       </tr></thead><tbody></tbody>`;
       directTbody = directTable.querySelector('tbody');
-      body.appendChild(directTable);
+      // Insert before the "+ Add Item" button (which itself is before + Add Sub-section)
+      if(directAddBtn) body.insertBefore(directTable, directAddBtn);
+      else body.appendChild(directTable);
       return directTable;
     };
 
@@ -467,39 +471,30 @@ function buildDayPane(id){
       });
     });
 
-    // Add buttons at category level (per-event only)
-    // Rule: only show buttons if category has NO named sub-sections
-    //       (with sub-sections, users add items via sub-section's own + Add Item)
-    const hasNamedSubs = namedSubs.length > 0;
+    // "+ Add Item" button — always present for direct items
+    directAddBtn = document.createElement('button');
+    directAddBtn.type = 'button';
+    directAddBtn.className = 'add-item-btn add-direct-item-btn';
+    directAddBtn.style.marginTop = '8px';
+    directAddBtn.textContent = '+ Add Item';
+    directAddBtn.onclick = () => {
+      ensureDirectTable();
+      const tr = addItemRow(directTbody, { day:id, ci, si:'direct', subtitle:"", catname:cat.name, custom:true });
+      const inp = tr.querySelector('.f-itemname'); if(inp) inp.focus();
+    };
+    body.appendChild(directAddBtn);
 
-    if(!hasNamedSubs){
-      const btnRow = document.createElement('div');
-      btnRow.className = 'cat-add-btns';
-      btnRow.style.cssText = 'display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;';
-
-      const addSubBtn = document.createElement('button');
-      addSubBtn.type = 'button';
-      addSubBtn.className = 'add-item-btn add-sub-btn';
-      addSubBtn.textContent = '+ Add Sub-section';
-      addSubBtn.onclick = () => {
-        const sd = addCustomSubsectionInline(id, cat.name, body);
-        const inp = sd.querySelector('.sub-title-input'); if(inp) inp.focus();
-      };
-      btnRow.appendChild(addSubBtn);
-
-      const addDirectBtn = document.createElement('button');
-      addDirectBtn.type = 'button';
-      addDirectBtn.className = 'add-item-btn add-direct-item-btn';
-      addDirectBtn.textContent = '+ Add Item';
-      addDirectBtn.onclick = () => {
-        ensureDirectTable();
-        const tr = addItemRow(directTbody, { day:id, ci, si:'direct', subtitle:"", catname:cat.name, custom:true });
-        const inp = tr.querySelector('.f-itemname'); if(inp) inp.focus();
-      };
-      btnRow.appendChild(addDirectBtn);
-
-      body.appendChild(btnRow);
-    }
+    // Category bottom: only "+ Add Sub-section"
+    const addSubBtn = document.createElement('button');
+    addSubBtn.type = 'button';
+    addSubBtn.className = 'add-item-btn add-sub-btn';
+    addSubBtn.style.marginTop = '10px';
+    addSubBtn.textContent = '+ Add Sub-section';
+    addSubBtn.onclick = () => {
+      const sd = addCustomSubsectionInline(id, cat.name, body);
+      const inp = sd.querySelector('.sub-title-input'); if(inp) inp.focus();
+    };
+    body.appendChild(addSubBtn);
 
     pane.appendChild(box);
 
@@ -764,10 +759,6 @@ function addCustomCategory(dayId, container, presetName){
     <div class="cat-body">
       <div class="custom-subs"></div>
       <div class="custom-direct-items"></div>
-      <div class="cat-mode-buttons" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
-        <button type="button" class="add-item-btn add-sub-btn">+ Add Sub-section</button>
-        <button type="button" class="add-item-btn add-direct-item-btn">+ Add Item</button>
-      </div>
     </div>`;
   container.appendChild(box);
   renumberCustomCategories(dayId);
@@ -784,77 +775,65 @@ function addCustomCategory(dayId, container, presetName){
     recalc();
   };
 
+  const body = box.querySelector('.cat-body');
   const subsBox = box.querySelector('.custom-subs');
   const directBox = box.querySelector('.custom-direct-items');
-  const modeButtons = box.querySelector('.cat-mode-buttons');
-  const subBtn = box.querySelector('.add-sub-btn');
-  const directBtn = box.querySelector('.add-direct-item-btn');
 
-  // Mode tracker: 'none' | 'subs' | 'direct'
-  const getMode = () => {
-    if(subsBox.querySelector('.subsection')) return 'subs';
-    if(directBox.querySelector('table tbody tr')) return 'direct';
-    return 'none';
-  };
-  const refreshModeButtons = () => {
-    const m = getMode();
-    if(m === 'none'){
-      subBtn.style.display = ''; directBtn.style.display = '';
-    } else if(m === 'subs'){
-      subBtn.style.display = ''; directBtn.style.display = 'none';
-    } else {
-      subBtn.style.display = 'none'; directBtn.style.display = '';
-    }
-  };
-
-  // Direct-items table (created lazily on first click)
+  // Direct-items table (created lazily on first add)
   let directTable = null;
+  let directTbody = null;
   const ensureDirectTable = () => {
     if(directTable) return directTable;
     directTable = document.createElement('table');
-    directTable.className = 'item-table';
+    directTable.className = 'item-table direct-items-table';
+    directTable.dataset.day = dayId; directTable.dataset.cat = 'cust'; directTable.dataset.sub = 'direct';
     directTable.innerHTML = `<thead><tr>
       <th>Item</th><th class="c-desc">Description</th><th class="c-size">Size</th>
       <th class="c-sqft">Sqft</th><th class="c-days">Days</th>
       <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th>
     </tr></thead><tbody></tbody>`;
+    directTbody = directTable.querySelector('tbody');
     directBox.appendChild(directTable);
-    // Observer: when rows removed and empty, refresh mode
-    new MutationObserver(refreshModeButtons).observe(directTable.querySelector('tbody'), { childList: true });
     return directTable;
   };
 
-  subBtn.onclick = () => {
-    const sd = addCustomSubsection(dayId, box, subsBox);
-    const inp = sd.querySelector('.sub-title-input'); if(inp) inp.focus();
-    refreshModeButtons();
-    new MutationObserver(refreshModeButtons).observe(subsBox, { childList: true });
-  };
-  directBtn.onclick = () => {
-    const tbl = ensureDirectTable();
-    const tr = addItemRow(tbl.querySelector('tbody'), {
-      day: dayId, ci: 'cust', si: 'cust',
-      subtitle: "",
-      catname: nameInput.value || 'Untitled',
-      custom: true
+  // "+ Add Item" button — attached under direct items area
+  const directAddBtn = document.createElement('button');
+  directAddBtn.type = 'button';
+  directAddBtn.className = 'add-item-btn add-direct-item-btn';
+  directAddBtn.style.marginTop = '8px';
+  directAddBtn.textContent = '+ Add Item';
+  directAddBtn.onclick = () => {
+    ensureDirectTable();
+    const tr = addItemRow(directTbody, {
+      day: dayId, ci: 'cust', si: 'direct',
+      subtitle: "", catname: nameInput.value || 'Untitled', custom: true
     });
     const inp = tr.querySelector('.f-itemname'); if(inp) inp.focus();
-    refreshModeButtons();
   };
+  directBox.appendChild(directAddBtn);
 
-  // Toggle open/close on header click, but not when interacting with inputs/remove
+  // Category bottom: only "+ Add Sub-section"
+  const addSubBtn = document.createElement('button');
+  addSubBtn.type = 'button';
+  addSubBtn.className = 'add-item-btn add-sub-btn';
+  addSubBtn.style.marginTop = '10px';
+  addSubBtn.textContent = '+ Add Sub-section';
+  addSubBtn.onclick = () => {
+    const sd = addCustomSubsection(dayId, box, subsBox);
+    const inp = sd.querySelector('.sub-title-input'); if(inp) inp.focus();
+  };
+  body.appendChild(addSubBtn);
+
+  // Toggle open/close on header click
   box.querySelector('.cat-header').addEventListener('click', (e) => {
     if(e.target.tagName === 'INPUT' || e.target.classList.contains('row-remove')) return;
     box.classList.toggle('open');
   });
 
-  // Watch subsBox for children removal (when all subs deleted -> reset mode)
-  new MutationObserver(refreshModeButtons).observe(subsBox, { childList: true });
-
   // Enable sub-section drag on this new custom category's subs container
   setupSubsectionSortable(subsBox);
 
-  refreshModeButtons();
   return box;
 }
 
