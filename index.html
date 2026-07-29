@@ -533,17 +533,19 @@ function buildDayPane(id){
 
 function setupSubsectionSortable(body){
   if(typeof Sortable === 'undefined' || !body) return;
-  if(body._sortableSubs) return;  // avoid double init
+  if(body._sortableSubs) return;
   body._sortableSubs = true;
   Sortable.create(body, {
     group: 'cres-subsections',
     handle: '.drag-handle',
-    draggable: '.subsection',
+    // No `draggable` restriction — drop between any children (tables, buttons) allowed
     animation: 150,
     filter: 'input, .row-remove, .pencil-edit, .sub-chev',
-    preventOnFilter: false,
     onEnd: (evt) => {
       const dragged = evt.item;
+      // Guard: only handle if item is actually a .subsection
+      if(!dragged.classList.contains('subsection')) return;
+
       const draggedTitle = (dragged.querySelector('.sub-title-display')?.textContent
                             || dragged.querySelector('.sub-title-input')?.value || "").trim();
       const targetCatBody = evt.to;
@@ -619,43 +621,44 @@ function enableSortables(pane){
     setupSubsectionSortable(body);
   });
 
-  // 3. Items reorderable within tbody (also allow cross-tbody moves)
-  pane.querySelectorAll('.item-table tbody').forEach(tbody => {
-    // Skip logistics table (columns differ)
-    if(tbody.closest('.logistics-table')) return;
-    Sortable.create(tbody, {
-      group: 'cres-items',       // same group => cross-container drag works
-      handle: '.item-name',
-      draggable: 'tr',
-      animation: 150,
-      filter: 'input, .row-remove, .pencil-edit',
-      preventOnFilter: false,
-      onEnd: (evt) => {
-        // Update tr dataset if item moved into a different sub-section/category tbody
-        const newTbody = evt.to;
-        const parentTable = newTbody.closest('table');
-        const parentSub = newTbody.closest('.subsection');
-        const parentCat = newTbody.closest('.category');
-        const tr = evt.item;
+  // 3. Item rows reorderable (initial pass — new tables also registered dynamically)
+  pane.querySelectorAll('.item-table tbody').forEach(tbody => setupItemSortable(tbody));
+}
 
-        if(parentCat){
-          const catNameEl = parentCat.querySelector('.cat-name-display') || parentCat.querySelector('.cat-name-input');
-          if(catNameEl){
-            const cname = catNameEl.tagName === 'INPUT' ? catNameEl.value : catNameEl.textContent.trim();
-            tr.dataset.catname = cname;
-          }
+function setupItemSortable(tbody){
+  if(typeof Sortable === 'undefined' || !tbody) return;
+  if(tbody._sortableItems) return;
+  if(tbody.closest('.logistics-table')) return;
+  tbody._sortableItems = true;
+  Sortable.create(tbody, {
+    group: 'cres-items',
+    handle: '.item-name',
+    draggable: 'tr',
+    animation: 150,
+    filter: 'input, .row-remove, .pencil-edit',
+    preventOnFilter: false,
+    onEnd: (evt) => {
+      const newTbody = evt.to;
+      const parentSub = newTbody.closest('.subsection');
+      const parentCat = newTbody.closest('.category');
+      const tr = evt.item;
+
+      if(parentCat){
+        const catNameEl = parentCat.querySelector('.cat-name-display') || parentCat.querySelector('.cat-name-input');
+        if(catNameEl){
+          const cname = catNameEl.tagName === 'INPUT' ? catNameEl.value : catNameEl.textContent.trim();
+          tr.dataset.catname = cname;
         }
-        if(parentSub){
-          const subTitleEl = parentSub.querySelector('.sub-title-display') || parentSub.querySelector('.sub-title-input');
-          if(subTitleEl){
-            const sname = subTitleEl.tagName === 'INPUT' ? subTitleEl.value : subTitleEl.textContent.trim();
-            tr.dataset.subtitle = sname;
-          }
-        }
-        syncLibraryOrder();
-        recalc();
       }
-    });
+      if(parentSub){
+        const subTitleEl = parentSub.querySelector('.sub-title-display') || parentSub.querySelector('.sub-title-input');
+        if(subTitleEl){
+          const sname = subTitleEl.tagName === 'INPUT' ? subTitleEl.value : subTitleEl.textContent.trim();
+          tr.dataset.subtitle = sname;
+        }
+      }
+      recalc();
+    }
   });
 }
 
@@ -688,6 +691,9 @@ function addItemRow(tbody, opts){
 
   tbody.appendChild(tr);
   tr.querySelectorAll('input').forEach(el => el.addEventListener('input', recalc));
+
+  // Ensure this tbody is registered with item Sortable (lazy init for newly created tables)
+  setupItemSortable(tbody);
 
   // Auto-calc sqft from size when size changes
   const sizeInp = tr.querySelector('.f-size');
