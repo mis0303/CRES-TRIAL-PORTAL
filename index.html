@@ -70,10 +70,6 @@
   .subsection.open .item-table{display:table;}
   .subsection.open .add-item-btn{display:inline-block;}
 
-  /* Logistics category (special) */
-  .logistics-cat .cat-header{border-left-color:#7a5b1c;}
-  .logistics-cat .cat-header .cat-name-display{color:#7a5b1c;}
-
   .item-table{width:100%; border-collapse:collapse; font-size:13.5px;}
   .item-table th{text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.4px; color:var(--muted); padding:7px 4px; border-bottom:1px solid var(--line); font-weight:600;}
   .item-table td{padding:6px 4px; border-bottom:1px solid #f0eada; vertical-align:middle;}
@@ -540,6 +536,51 @@ function buildDayPane(id){
   enableSortables(pane);
 }
 
+function setupSubsectionSortable(body){
+  if(typeof Sortable === 'undefined' || !body) return;
+  if(body._sortableSubs) return;  // avoid double init
+  body._sortableSubs = true;
+  Sortable.create(body, {
+    group: 'cres-subsections',
+    handle: '.drag-handle',
+    draggable: '.subsection',
+    animation: 150,
+    filter: 'input, .row-remove, .pencil-edit, .sub-chev',
+    preventOnFilter: false,
+    onEnd: (evt) => {
+      const dragged = evt.item;
+      const draggedTitle = (dragged.querySelector('.sub-title-display')?.textContent
+                            || dragged.querySelector('.sub-title-input')?.value || "").trim();
+      const targetCatBody = evt.to;
+      const targetCat = targetCatBody.closest('.category');
+      const targetCatName = targetCat
+        ? (targetCat.querySelector('.cat-name-display')?.textContent || targetCat.querySelector('.cat-name-input')?.value || "").trim()
+        : "";
+
+      // Check for clash in target category (across all sub-container types)
+      const targetCatSubs = targetCat ? Array.from(targetCat.querySelectorAll('.subsection')) : [];
+      const clash = targetCatSubs.some(sd => {
+        if(sd === dragged) return false;
+        const t = (sd.querySelector('.sub-title-display')?.textContent
+                   || sd.querySelector('.sub-title-input')?.value || "").trim();
+        return t && t === draggedTitle;
+      });
+
+      if(clash && evt.from !== evt.to){
+        alert(`"${draggedTitle}" already exists in "${targetCatName}". Move cancelled.`);
+        evt.from.insertBefore(dragged, evt.from.children[evt.oldIndex] || null);
+        recalc();
+        return;
+      }
+
+      if(targetCat){
+        dragged.querySelectorAll('tr').forEach(tr => tr.dataset.catname = targetCatName);
+      }
+      recalc();
+    }
+  });
+}
+
 function enableSortables(pane){
   if(typeof Sortable === 'undefined') return;
 
@@ -549,7 +590,7 @@ function enableSortables(pane){
   // AND the custom-cats container separately.
   Sortable.create(pane, {
     handle: '.cat-header',
-    draggable: '.category:not(.logistics-cat)',
+    draggable: '.category',
     animation: 150,
     filter: 'input, .row-remove, .pencil-edit, .chev',
     preventOnFilter: false,
@@ -560,47 +601,9 @@ function enableSortables(pane){
   });
 
   // 2. Sub-sections reorderable + can cross to other categories
-  pane.querySelectorAll('.cat-body').forEach(body => {
-    Sortable.create(body, {
-      group: 'cres-subsections',
-      handle: '.drag-handle',
-      draggable: '.subsection',
-      animation: 150,
-      filter: 'input, .row-remove, .pencil-edit, .sub-chev',
-      preventOnFilter: false,
-      onEnd: (evt) => {
-        const dragged = evt.item;
-        const draggedTitle = (dragged.querySelector('.sub-title-display')?.textContent
-                              || dragged.querySelector('.sub-title-input')?.value || "").trim();
-        const targetCatBody = evt.to;
-        const targetCat = targetCatBody.closest('.category');
-        const targetCatName = targetCat
-          ? (targetCat.querySelector('.cat-name-display')?.textContent || targetCat.querySelector('.cat-name-input')?.value || "").trim()
-          : "";
-
-        // Check for clash in target category (excluding the dragged one)
-        const clash = Array.from(targetCatBody.querySelectorAll('.subsection')).some(sd => {
-          if(sd === dragged) return false;
-          const t = (sd.querySelector('.sub-title-display')?.textContent
-                     || sd.querySelector('.sub-title-input')?.value || "").trim();
-          return t && t === draggedTitle;
-        });
-
-        if(clash && evt.from !== evt.to){
-          alert(`"${draggedTitle}" already exists in "${targetCatName}". Move cancelled.`);
-          // Move back to original position
-          evt.from.insertBefore(dragged, evt.from.children[evt.oldIndex] || null);
-          recalc();
-          return;
-        }
-
-        // Success: update dataset.catname on all rows inside moved sub-section
-        if(targetCat){
-          dragged.querySelectorAll('tr').forEach(tr => tr.dataset.catname = targetCatName);
-        }
-        recalc();
-      }
-    });
+  // Apply to both .cat-body (fixed categories) and .custom-subs (custom categories)
+  pane.querySelectorAll('.cat-body, .custom-subs').forEach(body => {
+    setupSubsectionSortable(body);
   });
 
   // 3. Items reorderable within tbody (also allow cross-tbody moves)
@@ -830,6 +833,9 @@ function addCustomCategory(dayId, container, presetName){
   // Watch subsBox for children removal (when all subs deleted -> reset mode)
   new MutationObserver(refreshModeButtons).observe(subsBox, { childList: true });
 
+  // Enable sub-section drag on this new custom category's subs container
+  setupSubsectionSortable(subsBox);
+
   refreshModeButtons();
   return box;
 }
@@ -979,7 +985,7 @@ function buildLogisticsCategory(dayId, catNum){
   box.dataset.day = dayId;
   box.innerHTML = `
     <div class="cat-header">
-      <span><span class="cat-num">${catNum}.</span> <span class="cat-name-display">Logistics</span></span>
+      <span><span class="cat-num">${catNum}.</span> <span class="cat-name-display">Logistics</span><span class="pencil-edit" onclick="event.stopPropagation(); editCategoryName(this)" title="Rename category">✏️</span></span>
       <span class="right"><span class="cat-total">₹0</span><span class="chev">▶</span></span>
     </div>
     <div class="cat-body">
