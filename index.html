@@ -408,7 +408,7 @@ function buildDayPane(id){
     namedSubs.forEach((sub, siNamed) => {
       const si = cat.subs.indexOf(sub); // original index for data-attrs
       const sd = document.createElement('div');
-      sd.className='subsection open';
+      sd.className='subsection';
       sd.innerHTML = `<div class="subsection-title"><span class="drag-handle" title="Drag to reorder">⋮⋮</span><span class="sub-chev">▶</span><span class="sub-title-display">${sub.title}</span><span class="pencil-edit" onclick="event.stopPropagation(); editSubsectionName(this)" title="Rename sub-section">✏️</span></div>`;
       const titleDiv = sd.querySelector('.subsection-title');
       titleDiv.addEventListener('click', (e) => {
@@ -998,7 +998,7 @@ function updateDayDate(id,val){
 // ===================== LOGISTICS (category-styled) =====================
 function buildLogisticsCategory(dayId, catNum){
   const box = document.createElement('div');
-  box.className = 'category logistics-cat open';
+  box.className = 'category logistics-cat';
   box.dataset.logisticsCat = "1";
   box.dataset.day = dayId;
   box.innerHTML = `
