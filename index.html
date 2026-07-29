@@ -589,6 +589,7 @@ function enableSortables(pane){
   // Simpler: make the pane itself the sortable container for direct .category children,
   // AND the custom-cats container separately.
   Sortable.create(pane, {
+    group: 'cres-categories',
     handle: '.cat-header',
     draggable: '.category',
     animation: 150,
@@ -599,6 +600,23 @@ function enableSortables(pane){
       recalc();
     }
   });
+
+  // Also make custom-cats container a drop zone (same group)
+  const customCatsBox = pane.querySelector('.custom-cats');
+  if(customCatsBox){
+    Sortable.create(customCatsBox, {
+      group: 'cres-categories',
+      handle: '.cat-header',
+      draggable: '.category',
+      animation: 150,
+      filter: 'input, .row-remove, .pencil-edit, .chev',
+      preventOnFilter: false,
+      onEnd: () => {
+        renumberAllCategories(pane);
+        recalc();
+      }
+    });
+  }
 
   // 2. Sub-sections reorderable + can cross to other categories
   // Apply to both .cat-body (fixed categories) and .custom-subs (custom categories)
