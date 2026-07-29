@@ -400,13 +400,56 @@ function buildDayPane(id){
       <div class="cat-body"></div>`;
     const body = box.querySelector('.cat-body');
 
-    // Split subs: named sub-sections first, blank ("direct items") last
+    // Split subs: named sub-sections vs direct items (blank sub-section title)
     const namedSubs = cat.subs.filter(s => s.title && s.title.trim() !== "");
     const directSubs = cat.subs.filter(s => !s.title || s.title.trim() === "");
 
-    // Render named sub-sections
+    // ===== ZONE 1 (TOP): Direct items table (only if items exist) =====
+    let directTable = null;
+    let directTbody = null;
+    let directAddBtn = null;
+
+    const ensureDirectTable = () => {
+      if(directTable) return directTable;
+      directTable = document.createElement('table');
+      directTable.className='item-table direct-items-table';
+      directTable.dataset.day=id; directTable.dataset.cat=ci; directTable.dataset.sub='direct';
+      directTable.innerHTML = `<thead><tr>
+        <th>Item</th><th class="c-desc">Description</th><th class="c-size">Size</th>
+        <th class="c-sqft">Sqft</th><th class="c-days">Days</th>
+        <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th>
+      </tr></thead><tbody></tbody>`;
+      directTbody = directTable.querySelector('tbody');
+      // Table sits above the "+ Add Item" button
+      if(directAddBtn) body.insertBefore(directTable, directAddBtn);
+      else body.appendChild(directTable);
+      return directTable;
+    };
+
+    directSubs.forEach(sub => {
+      if(!sub.items || sub.items.length === 0) return;
+      ensureDirectTable();
+      sub.items.forEach(item => {
+        addItemRow(directTbody, { day:id, ci, si:'direct', subtitle:"", catname:cat.name, item, custom:false });
+      });
+    });
+
+    // "+ Add Item" button (always present) — creates table lazily
+    directAddBtn = document.createElement('button');
+    directAddBtn.type = 'button';
+    directAddBtn.className = 'add-item-btn add-direct-item-btn';
+    directAddBtn.style.marginTop = '8px';
+    directAddBtn.textContent = '+ Add Item';
+    directAddBtn.onclick = () => {
+      ensureDirectTable();
+      const tr = addItemRow(directTbody, { day:id, ci, si:'direct', subtitle:"", catname:cat.name, custom:true });
+      const inp = tr.querySelector('.f-itemname'); if(inp) inp.focus();
+    };
+    body.appendChild(directAddBtn);
+
+    // ===== ZONE 2 (MIDDLE): Named sub-sections =====
     namedSubs.forEach((sub, siNamed) => {
-      const si = cat.subs.indexOf(sub); // original index for data-attrs
+      const si = cat.subs.indexOf(sub);
       const sd = document.createElement('div');
       sd.className='subsection';
       sd.innerHTML = `<div class="subsection-title"><span class="drag-handle" title="Drag to reorder">⋮⋮</span><span class="sub-chev">▶</span><span class="sub-title-display">${sub.title}</span><span class="pencil-edit" onclick="event.stopPropagation(); editSubsectionName(this)" title="Rename sub-section">✏️</span></div>`;
@@ -441,50 +484,7 @@ function buildDayPane(id){
       body.appendChild(sd);
     });
 
-    // Render direct items table (from blank-sub items)
-    let directTable = null;
-    let directTbody = null;
-    let directAddBtn = null;
-
-    const ensureDirectTable = () => {
-      if(directTable) return directTable;
-      directTable = document.createElement('table');
-      directTable.className='item-table direct-items-table';
-      directTable.dataset.day=id; directTable.dataset.cat=ci; directTable.dataset.sub='direct';
-      directTable.innerHTML = `<thead><tr>
-        <th>Item</th><th class="c-desc">Description</th><th class="c-size">Size</th>
-        <th class="c-sqft">Sqft</th><th class="c-days">Days</th>
-        <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th>
-      </tr></thead><tbody></tbody>`;
-      directTbody = directTable.querySelector('tbody');
-      // Insert before the "+ Add Item" button (which itself is before + Add Sub-section)
-      if(directAddBtn) body.insertBefore(directTable, directAddBtn);
-      else body.appendChild(directTable);
-      return directTable;
-    };
-
-    directSubs.forEach(sub => {
-      if(!sub.items || sub.items.length === 0) return;
-      ensureDirectTable();
-      sub.items.forEach(item => {
-        addItemRow(directTbody, { day:id, ci, si:'direct', subtitle:"", catname:cat.name, item, custom:false });
-      });
-    });
-
-    // "+ Add Item" button — always present for direct items
-    directAddBtn = document.createElement('button');
-    directAddBtn.type = 'button';
-    directAddBtn.className = 'add-item-btn add-direct-item-btn';
-    directAddBtn.style.marginTop = '8px';
-    directAddBtn.textContent = '+ Add Item';
-    directAddBtn.onclick = () => {
-      ensureDirectTable();
-      const tr = addItemRow(directTbody, { day:id, ci, si:'direct', subtitle:"", catname:cat.name, custom:true });
-      const inp = tr.querySelector('.f-itemname'); if(inp) inp.focus();
-    };
-    body.appendChild(directAddBtn);
-
-    // Category bottom: only "+ Add Sub-section"
+    // ===== ZONE 3 (BOTTOM): "+ Add Sub-section" =====
     const addSubBtn = document.createElement('button');
     addSubBtn.type = 'button';
     addSubBtn.className = 'add-item-btn add-sub-btn';
@@ -757,8 +757,8 @@ function addCustomCategory(dayId, container, presetName){
       </span>
     </div>
     <div class="cat-body">
-      <div class="custom-subs"></div>
       <div class="custom-direct-items"></div>
+      <div class="custom-subs"></div>
     </div>`;
   container.appendChild(box);
   renumberCustomCategories(dayId);
@@ -793,7 +793,10 @@ function addCustomCategory(dayId, container, presetName){
       <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th>
     </tr></thead><tbody></tbody>`;
     directTbody = directTable.querySelector('tbody');
-    directBox.appendChild(directTable);
+    // Insert BEFORE the Add Item button so table appears above button
+    const btn = directBox.querySelector('.add-direct-item-btn');
+    if(btn) directBox.insertBefore(directTable, btn);
+    else directBox.appendChild(directTable);
     return directTable;
   };
 
