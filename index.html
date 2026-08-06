@@ -538,14 +538,13 @@ function setupSubsectionSortable(body){
   Sortable.create(body, {
     group: 'cres-subsections',
     handle: '.drag-handle',
-    // No `draggable` restriction — drop between any children (tables, buttons) allowed
+    draggable: '.subsection',
     animation: 150,
+    forceFallback: true,
     filter: 'input, .row-remove, .pencil-edit, .sub-chev',
+    preventOnFilter: false,
     onEnd: (evt) => {
       const dragged = evt.item;
-      // Guard: only handle if item is actually a .subsection
-      if(!dragged.classList.contains('subsection')) return;
-
       const draggedTitle = (dragged.querySelector('.sub-title-display')?.textContent
                             || dragged.querySelector('.sub-title-input')?.value || "").trim();
       const targetCatBody = evt.to;
@@ -554,7 +553,6 @@ function setupSubsectionSortable(body){
         ? (targetCat.querySelector('.cat-name-display')?.textContent || targetCat.querySelector('.cat-name-input')?.value || "").trim()
         : "";
 
-      // Check for clash in target category (across all sub-container types)
       const targetCatSubs = targetCat ? Array.from(targetCat.querySelectorAll('.subsection')) : [];
       const clash = targetCatSubs.some(sd => {
         if(sd === dragged) return false;
@@ -590,6 +588,7 @@ function enableSortables(pane){
     handle: '.cat-header',
     draggable: '.category',
     animation: 150,
+    forceFallback: true,
     filter: 'input, .row-remove, .pencil-edit, .chev',
     preventOnFilter: false,
     onEnd: () => {
@@ -606,6 +605,7 @@ function enableSortables(pane){
       handle: '.cat-header',
       draggable: '.category',
       animation: 150,
+      forceFallback: true,
       filter: 'input, .row-remove, .pencil-edit, .chev',
       preventOnFilter: false,
       onEnd: () => {
@@ -635,6 +635,7 @@ function setupItemSortable(tbody){
     handle: '.item-name',
     draggable: 'tr',
     animation: 150,
+    forceFallback: true,
     filter: 'input, .row-remove, .pencil-edit',
     preventOnFilter: false,
     onEnd: (evt) => {
