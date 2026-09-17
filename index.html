@@ -87,8 +87,8 @@
   .item-table.no-days th.c-days, .item-table.no-days td.c-days{display:none;}
 
   /* ===== NEW: Remark column + editable Amount input ===== */
-  .c-remark{width:15%;}
-  .item-table td.c-remark input.f-remark{width:100%; padding:7px 9px; font-size:14px;}
+  .c-remark{width:11%;}
+  .item-table td.c-remark input{width:100%; padding:7px 9px; font-size:14px;}
   .item-table td.amount-cell input.f-amount{width:100%; padding:7px 9px; font-size:14px; text-align:right; font-weight:600; color:var(--navy);}
   .item-table td.amount-cell input.f-amount::placeholder{color:var(--muted); font-weight:400; font-style:italic;}
 
@@ -246,10 +246,7 @@
         <select id="versionPicker" disabled><option value="">&mdash;</option></select>
       </div>
     </div>
-    <div class="delete-actions" id="deleteActions" style="display:none;">
-      <button type="button" class="btn-delete btn-delete-version" onclick="confirmDeleteVersion()">&#128465;&#65039; Delete This Version</button>
-      <button type="button" class="btn-delete btn-delete-event" onclick="confirmDeleteEvent()">&#9888;&#65039; Delete Entire Event</button>
-    </div>
+    <div class="delete-actions" id="deleteActions" style="display:none;"></div>
     <div class="status info" id="editLoadStatus" style="display:none;"></div>
   </div>
 
@@ -306,6 +303,18 @@
 
 <footer>Creative Rays Entertainment Solutions — Internal Tool</footer>
 
+<div id="savePromptOverlay" style="display:none; position:fixed; inset:0; background:rgba(16,36,62,.55); z-index:9999; align-items:center; justify-content:center;">
+  <div style="background:#fff; max-width:420px; width:90%; border-radius:14px; padding:22px; box-shadow:0 18px 50px rgba(0,0,0,.3);">
+    <div style="font-weight:800; font-size:16px; color:#10243e; margin-bottom:8px;">Unsaved changes</div>
+    <div style="font-size:14px; color:#333; line-height:1.5; margin-bottom:18px;">You have unsaved changes. Save before leaving?</div>
+    <div style="display:flex; gap:10px; justify-content:flex-end; flex-wrap:wrap;">
+      <button type="button" id="spCancel" class="btn btn-secondary" style="padding:9px 14px;">Cancel</button>
+      <button type="button" id="spDont" class="btn" style="padding:9px 14px; background:#eee; color:#333;">Don't Save</button>
+      <button type="button" id="spSave" class="btn btn-primary" style="padding:9px 14px;">Save</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ===================== CONFIG =====================
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyvWJ1YGfYLeIIsAJ4zdDFG4uBODhbI-XJGpPgzbe3pe49dIUfpGduUUIu2zD2wAriB/exec";
@@ -349,6 +358,40 @@ function applyColLabels(root){
   scope.querySelectorAll('.item-table.pax td.c-qty').forEach(td=>{ td.setAttribute('data-label','Pax'); });
 }
 
+// Safe calculator for the Amount box: allows numbers and + - * / ( ) . only.
+// x/X -> * , strips ft/sqft/feet/commas/spaces/₹/rs. Returns a number or null.
+function evalAmount(raw){
+  if(raw==null) return null;
+  let s = String(raw).trim();
+  if(s==="") return null;
+  s = s.replace(/[xX]/g,'*')
+       .replace(/rs\.?/gi,'')
+       .replace(/(sq\s*ft|sqft|feet|ft)/gi,'')
+       .replace(/[₹,\s]/g,'');
+  if(s==="") return null;
+  if(!/^[0-9+\-*/().]+$/.test(s)) return null;  // any stray letter -> reject (stays blank/auto)
+  try{
+    const val = Function('"use strict"; return (' + s + ');')();
+    if(typeof val === 'number' && isFinite(val)) return Math.round(val*100)/100;
+  }catch(e){}
+  return null;
+}
+// Attach to an amount input: on blur / Enter, evaluate an expression into a number.
+function attachAmountCalc(inp, tr){
+  if(!inp) return;
+  const run = ()=>{
+    const raw = inp.value;
+    if(/[+\-*/xX()]/.test(raw)){          // looks like a calculation
+      const v = evalAmount(raw);
+      if(v!=null) inp.value = v;           // replace expr with result
+    }
+    tr.dataset.manualAmt = (inp.value||"").trim()!=="" ? "1" : "0";
+    recalc();
+  };
+  inp.addEventListener('blur', run);
+  inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); run(); inp.blur(); } });
+}
+
 const LOGISTICS = [
   { vehicle: "Sedan", routes: ["Pune Airport to JW Marriott", "Mumbai to Pune"] },
   { vehicle: "Innova Crysta", routes: ["Pune Airport to JW Marriott", "Mumbai to Pune"] },
@@ -366,7 +409,15 @@ let currentVersion = null;
 let currentEventName = null;
 
 // ===================== MODE =====================
+let _bypassGuard = false;
 function setMode(m){
+  if(!_bypassGuard && hasUnsavedContent()){
+    // keep tab highlight on current mode until user decides
+    document.getElementById('tab-new').classList.toggle('active', mode==='new');
+    document.getElementById('tab-edit').classList.toggle('active', mode==='edit');
+    showSavePrompt(()=>{ _bypassGuard = true; setMode(m); _bypassGuard = false; });
+    return;
+  }
   mode = m;
   document.getElementById('tab-new').classList.toggle('active', m==='new');
   document.getElementById('tab-edit').classList.toggle('active', m==='edit');
@@ -485,7 +536,7 @@ function buildDayPane(id){
       directTable.innerHTML = `<thead><tr>
         <th>Item</th><th class="c-desc">Description</th><th class="c-size">Size</th>
         <th class="c-sqft">Sqft</th><th class="c-days">Days</th>
-        <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th><th class="c-remark">Remark</th>
+        <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th><th class="c-remark c-rc">Remark (Client)</th><th class="c-remark c-rd">Remark (Doer)</th>
       </tr></thead><tbody></tbody>`;
       directTbody = directTable.querySelector('tbody');
       // Table sits above the "+ Add Item" button
@@ -532,14 +583,14 @@ function buildDayPane(id){
       table.innerHTML = `<thead><tr>
         <th>Item</th><th class="c-desc">Description</th><th class="c-size">Size</th>
         <th class="c-sqft">Sqft</th><th class="c-days">Days</th>
-        <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th><th class="c-remark">Remark</th>
+        <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th><th class="c-remark c-rc">Remark (Client)</th><th class="c-remark c-rd">Remark (Doer)</th>
       </tr></thead><tbody></tbody>`;
       const tbody = table.querySelector('tbody');
 
       sub.items.forEach((item)=>{
         addItemRow(tbody, { day:id, ci, si, subtitle:sub.title, catname:cat.name, item, custom:false });
       });
-      sd.appendChild(table);
+      sd.appendChild(table); applyColLabels(sd);
 
       const addBtn = document.createElement('button');
       addBtn.type='button'; addBtn.className='add-item-btn';
@@ -748,13 +799,15 @@ function addItemRow(tbody, opts){
     <td class="c-days" data-label="Days"><input type="number" class="f-days" min="0" step="1"></td>
     <td class="c-qty" data-label="Qty"><input type="number" class="f-qty" min="0" step="1"></td>
     <td class="c-rate" data-label="Rate (₹)"><input type="number" class="f-rate" min="0" step="0.01"></td>
-    <td class="amount-cell c-amt" data-label="Amount"><input type="number" class="f-amount" min="0" step="0.01" placeholder="auto"></td>
-    <td class="c-remark" data-label="Remark"><input type="text" class="f-remark" placeholder="Remark"></td>`;
+    <td class="amount-cell c-amt" data-label="Amount"><input type="text" inputmode="text" class="f-amount" placeholder="auto · e.g. 10*20*150 (* not x)"></td>
+    <td class="c-remark" data-label="Remark (Client)"><input type="text" class="f-remark-client" placeholder="Client remark"></td>
+    <td class="c-remark" data-label="Remark (Doer)"><input type="text" class="f-remark-doer" placeholder="Doer remark"></td>`;
 
   tbody.appendChild(tr);
   const _amtInp = tr.querySelector('.f-amount');
   if(_amtInp){ _amtInp.addEventListener('input', ()=>{ tr.dataset.manualAmt = _amtInp.value.trim()!=="" ? "1" : "0"; }); }
   tr.querySelectorAll('input').forEach(el => el.addEventListener('input', recalc));
+  attachAmountCalc(_amtInp, tr);
 
   // Ensure this tbody is registered with item Sortable (lazy init for newly created tables)
   setupItemSortable(tbody);
@@ -852,7 +905,7 @@ function addCustomCategory(dayId, container, presetName){
     directTable.innerHTML = `<thead><tr>
       <th>Item</th><th class="c-desc">Description</th><th class="c-size">Size</th>
       <th class="c-sqft">Sqft</th><th class="c-days">Days</th>
-      <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th><th class="c-remark">Remark</th>
+      <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th><th class="c-remark c-rc">Remark (Client)</th><th class="c-remark c-rd">Remark (Doer)</th>
     </tr></thead><tbody></tbody>`;
     directTbody = directTable.querySelector('tbody');
     const btn = directBox.querySelector('.add-direct-item-btn');
@@ -913,13 +966,13 @@ function addCustomSubsection(dayId, catBox, container, presetTitle){
   });
 
   const table = document.createElement('table');
-  table.className = 'item-table';
+  table.className = itemTableClass(catBox.querySelector('.cat-name-input')?.value || '');
   table.innerHTML = `<thead><tr>
     <th>Item</th><th class="c-desc">Description</th><th class="c-size">Size</th>
     <th class="c-sqft">Sqft</th><th class="c-days">Days</th>
-    <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th><th class="c-remark">Remark</th>
+    <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th><th class="c-remark c-rc">Remark (Client)</th><th class="c-remark c-rd">Remark (Doer)</th>
   </tr></thead><tbody></tbody>`;
-  sd.appendChild(table);
+  sd.appendChild(table); applyColLabels(sd);
 
   const addItemBtn = document.createElement('button');
   addItemBtn.type='button'; addItemBtn.className='add-item-btn';
@@ -965,13 +1018,13 @@ function addCustomSubsectionInline(dayId, catName, catBody, presetTitle){
   });
 
   const table = document.createElement('table');
-  table.className = 'item-table';
+  table.className = itemTableClass(catName);
   table.innerHTML = `<thead><tr>
     <th>Item</th><th class="c-desc">Description</th><th class="c-size">Size</th>
     <th class="c-sqft">Sqft</th><th class="c-days">Days</th>
-    <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th><th class="c-remark">Remark</th>
+    <th class="c-qty">Qty</th><th class="c-rate">Rate</th><th class="c-amt">Amount</th><th class="c-remark c-rc">Remark (Client)</th><th class="c-remark c-rd">Remark (Doer)</th>
   </tr></thead><tbody></tbody>`;
-  sd.appendChild(table);
+  sd.appendChild(table); applyColLabels(sd);
 
   const addItemBtn = document.createElement('button');
   addItemBtn.type='button'; addItemBtn.className='add-item-btn';
@@ -1049,7 +1102,7 @@ function buildLogisticsCategory(dayId, catNum){
         <thead><tr>
           <th>Vehicle</th><th>Route</th>
           <th class="c-qty">Qty</th><th class="c-rate">Rate</th>
-          <th class="c-amt">Amount</th><th class="c-remark">Remark</th><th style="width:30px;"></th>
+          <th class="c-amt">Amount</th><th class="c-remark c-rc">Remark (Client)</th><th class="c-remark c-rd">Remark (Doer)</th><th style="width:30px;"></th>
         </tr></thead>
         <tbody></tbody>
       </table>
@@ -1095,14 +1148,16 @@ function addLogisticsRowInto(tbody, data){
     <td data-label="Route"><input type="text" class="f-route" placeholder="e.g. Pune Airport to JW" value="${(data&&data.route)||''}"></td>
     <td class="c-qty" data-label="Qty"><input type="number" class="f-qty" min="0" step="1" value="${(data&&data.qty)||''}"></td>
     <td class="c-rate" data-label="Rate (₹)"><input type="number" class="f-rate" min="0" step="0.01" value="${(data&&data.rate)||''}"></td>
-    <td class="amount-cell c-amt" data-label="Amount"><input type="number" class="f-amount" min="0" step="0.01" placeholder="auto" value="${amtVal}"></td>
-    <td class="c-remark" data-label="Remark"><input type="text" class="f-remark" placeholder="Remark" value="${(data&&data.remark)||''}"></td>
+    <td class="amount-cell c-amt" data-label="Amount"><input type="text" inputmode="text" class="f-amount" placeholder="auto · e.g. 10*20 (* not x)" value="${amtVal}"></td>
+    <td class="c-remark" data-label="Remark (Client)"><input type="text" class="f-remark-client" placeholder="Client remark" value="${(data&&(data.remarkClient!=null?data.remarkClient:data.remark))||''}"></td>
+    <td class="c-remark" data-label="Remark (Doer)"><input type="text" class="f-remark-doer" placeholder="Doer remark" value="${(data&&data.remarkDoer)||''}"></td>
     <td><span class="row-remove" onclick="this.closest('tr').remove(); recalc();" title="Remove">&#10005;</span></td>`;
   if(data && data.manualAmt) tr.dataset.manualAmt = "1";
   tbody.appendChild(tr);
   const _amtInp = tr.querySelector('.f-amount');
   if(_amtInp){ _amtInp.addEventListener('input', ()=>{ tr.dataset.manualAmt = _amtInp.value.trim()!=="" ? "1" : "0"; }); }
   tr.querySelectorAll('input').forEach(el=>el.addEventListener('input', recalc));
+  attachAmountCalc(_amtInp, tr);
   const _sel = tr.querySelector('.f-vehicle-sel');
   if(_sel) _sel.addEventListener('change', recalc);
   return tr;
@@ -1247,12 +1302,13 @@ function collectPayload(){
       const dys = tr.querySelector('.f-days')?.value || "";
       const qty = qtyEl.value;
       const rate = tr.querySelector('.f-rate')?.value || "";
-      const remark = tr.querySelector('.f-remark')?.value || "";
+      const remarkClient = tr.querySelector('.f-remark-client')?.value || "";
+      const remarkDoer = tr.querySelector('.f-remark-doer')?.value || "";
       const manualAmtVal = tr.querySelector('.f-amount')?.value || "";
       const isManual = tr.dataset.manualAmt === "1" && manualAmtVal.trim() !== "";
       const useSqftEl = tr.querySelector('.f-usesqft');
       const useSqft = useSqftEl ? useSqftEl.checked : false;
-      const hasAnyValue = (desc || size || sqft || dys || qty || rate || manualAmtVal || remark);
+      const hasAnyValue = (desc || size || sqft || dys || qty || rate || manualAmtVal || remarkClient || remarkDoer);
       if(hasAnyValue && itemName){
         const eDays = (parseFloat(dys)||0)===0 ? 1 : parseFloat(dys);
         const sMult = (useSqft && (parseFloat(sqft)||0) > 0) ? parseFloat(sqft) : 1;
@@ -1263,7 +1319,7 @@ function collectPayload(){
           dayId: d.id, dayLabel: d.label, dayDate: d.date,
           category, subSection, item: itemName,
           isCustom: isCustom, useSqft: useSqft, manualAmt: isManual,
-          description: desc, size: size, remark: remark,
+          description: desc, size: size, remarkClient: remarkClient, remarkDoer: remarkDoer,
           sqft: parseFloat(sqft)||"", days: parseFloat(dys)||"",
           qty: parseFloat(qty)||0, rate: parseFloat(rate)||0, amount: amt
         });
@@ -1279,12 +1335,13 @@ function collectPayload(){
     const route = (tr.querySelector('.f-route')?.value || "").trim();
     const qty = tr.querySelector('.f-qty').value;
     const rate = tr.querySelector('.f-rate').value;
-    const remark = tr.querySelector('.f-remark')?.value || "";
+    const remarkClient = tr.querySelector('.f-remark-client')?.value || "";
+    const remarkDoer = tr.querySelector('.f-remark-doer')?.value || "";
     const manualAmtVal = tr.querySelector('.f-amount')?.value || "";
     const isManual = tr.dataset.manualAmt === "1" && manualAmtVal.trim() !== "";
-    if(vehicle || route || qty || rate || manualAmtVal || remark){
+    if(vehicle || route || qty || rate || manualAmtVal || remarkClient || remarkDoer){
       logistics.push({
-        vehicle: vehicle, route: route, remark: remark, manualAmt: isManual,
+        vehicle: vehicle, route: route, remarkClient: remarkClient, remarkDoer: remarkDoer, manualAmt: isManual,
         qty: parseFloat(qty)||0, rate: parseFloat(rate)||0,
         amount: isManual ? (parseFloat(manualAmtVal)||0) : (parseFloat(qty)||0)*(parseFloat(rate)||0)
       });
@@ -1316,7 +1373,7 @@ async function submitForm(action){
   const statusEl = document.getElementById('statusMsg');
   const payload = collectPayload();
   if(!payload.header.client || !payload.header.eventName){
-    statusEl.className="status err"; statusEl.textContent="Client and Event Name are required."; return;
+    statusEl.className="status err"; statusEl.textContent="Client and Event Name are required."; return false;
   }
   payload.action = action;
   payload.eventId = currentEventId;
@@ -1326,7 +1383,7 @@ async function submitForm(action){
     console.log("PAYLOAD (demo):", payload);
     statusEl.className="status info";
     statusEl.textContent = `Demo mode — payload logged to console. Connect SCRIPT_URL to save.`;
-    return;
+    return false;
   }
 
   statusEl.className="status info"; statusEl.textContent="Saving...";
@@ -1345,11 +1402,14 @@ async function submitForm(action){
         currentEventId = data.eventId;
         currentVersion = data.version;
       }
+      return true;
     } else {
       statusEl.className="status err"; statusEl.textContent = "Error: " + (data.message||"unknown");
+      return false;
     }
   } catch(err){
     statusEl.className="status err"; statusEl.textContent = "Network error: " + err.message;
+    return false;
   }
 }
 
@@ -1584,7 +1644,8 @@ function applyLoadedData(data){
       (data.logistics||[]).forEach(lg=>{
         addLogisticsRowInto(logTbody, {
           vehicle:lg.vehicle, route:lg.route, qty:lg.qty, rate:lg.rate,
-          remark:lg.remark, manualAmt:lg.manualAmt, amount:lg.amount
+          remarkClient:(lg.remarkClient!=null?lg.remarkClient:lg.remark), remarkDoer:lg.remarkDoer,
+          manualAmt:lg.manualAmt, amount:lg.amount
         });
       });
     }
@@ -1626,8 +1687,10 @@ function fillRowFields(tr, li){
   tr.querySelector('.f-rate').value = li.rate || "";
   const useEl = tr.querySelector('.f-usesqft');
   if(useEl) useEl.checked = !!li.useSqft;
-  const remEl = tr.querySelector('.f-remark');
-  if(remEl) remEl.value = li.remark || "";
+  const rcEl = tr.querySelector('.f-remark-client');
+  if(rcEl) rcEl.value = (li.remarkClient!=null ? li.remarkClient : (li.remark||"")) || "";
+  const rdEl = tr.querySelector('.f-remark-doer');
+  if(rdEl) rdEl.value = li.remarkDoer || "";
   const amtEl = tr.querySelector('.f-amount');
   if(amtEl && li.manualAmt){
     amtEl.value = (li.amount !== undefined && li.amount !== null) ? li.amount : "";
@@ -1873,6 +1936,20 @@ async function reloadLibrary(){
   });
 })();
 
+let _spProceed = null;
+function showSavePrompt(proceed){
+  _spProceed = proceed;
+  document.getElementById('savePromptOverlay').style.display = 'flex';
+}
+function _spHide(){ document.getElementById('savePromptOverlay').style.display = 'none'; }
+document.getElementById('spCancel').onclick = () => { _spHide(); _spProceed = null; };
+document.getElementById('spDont').onclick = () => { _spHide(); const p = _spProceed; _spProceed = null; if(p) p(); };
+document.getElementById('spSave').onclick = async () => {
+  const p = _spProceed; _spProceed = null; _spHide();
+  const ok = await submitForm(currentEventId ? 'updateCurrent' : 'create');
+  if(ok && p) p();
+};
+
 function hasUnsavedContent(){
   const client = (document.getElementById('client')?.value || "").trim();
   const eventName = (document.getElementById('eventName')?.value || "").trim();
@@ -1883,7 +1960,7 @@ function hasUnsavedContent(){
   const inputs = document.querySelectorAll(
     '.day-pane input.f-qty, .day-pane input.f-rate, .day-pane input.f-days, ' +
     '.day-pane input.f-sqft, .day-pane input.f-desc, .day-pane input.f-size, ' +
-    '.day-pane input.f-amount, .day-pane input.f-remark, ' +
+    '.day-pane input.f-amount, .day-pane input.f-remark-client, .day-pane input.f-remark-doer, ' +
     '.day-pane input.f-route, .day-pane input.f-itemname, .day-pane input.f-vehicle-other'
   );
   for(const inp of inputs){
