@@ -364,12 +364,10 @@ function evalAmount(raw){
   if(raw==null) return null;
   let s = String(raw).trim();
   if(s==="") return null;
-  s = s.replace(/[xX]/g,'*')
-       .replace(/rs\.?/gi,'')
-       .replace(/(sq\s*ft|sqft|feet|ft)/gi,'')
-       .replace(/[₹,\s]/g,'');
+  s = s.replace(/[xX]/g,'*');            // x / X used as multiply -> *
+  s = s.replace(/[^0-9+\-*/().]/g,'');   // strip everything else (sqft, ft, h, w, mm, ₹, commas, spaces...)
   if(s==="") return null;
-  if(!/^[0-9+\-*/().]+$/.test(s)) return null;  // any stray letter -> reject (stays blank/auto)
+  if(!/[0-9]/.test(s)) return null;      // must have at least one number
   try{
     const val = Function('"use strict"; return (' + s + ');')();
     if(typeof val === 'number' && isFinite(val)) return Math.round(val*100)/100;
@@ -391,18 +389,15 @@ function attachAmountCalc(inp, tr){
   inp.addEventListener('blur', run);
   inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); run(); inp.blur(); } });
 }
-// Size box: type a dimension like 15*15 (or 15x15 / 10ft x 20ft) -> auto-fill Sqft with the product.
-// Size text stays as typed; only Sqft is derived. Tick the Sqft checkbox to include it in the Amount.
+// Size box: type a dimension/expression like 15ft*20ft (or 15*15, 20x20x3) and it
+// evaluates in place on blur/Enter -> the box shows the computed number. Units/letters ignored.
 function attachSizeCalc(inp, tr){
   if(!inp) return;
   const run = ()=>{
     const raw = inp.value;
-    if(/[*xX]/.test(raw)){                 // only when it's a multiplication
+    if(/[+\-*/xX()]/.test(raw)){          // only when it looks like a calculation
       const v = evalAmount(raw);
-      if(v!=null){
-        const sq = tr.querySelector('.f-sqft');
-        if(sq){ sq.value = v; recalc(); }
-      }
+      if(v!=null) inp.value = v;           // replace expression with result, in the same box
     }
   };
   inp.addEventListener('blur', run);
@@ -811,12 +806,12 @@ function addItemRow(tbody, opts){
 
   tr.innerHTML = itemCell + `
     <td class="c-desc" data-label="Description"><input type="text" class="f-desc"></td>
-    <td class="c-size" data-label="Size"><input type="text" class="f-size"></td>
+    <td class="c-size" data-label="Size"><input type="text" class="f-size" placeholder="e.g. 15ft*20ft"></td>
     ${sqftCell}
     <td class="c-days" data-label="Days"><input type="number" class="f-days" min="0" step="1"></td>
     <td class="c-qty" data-label="Qty"><input type="number" class="f-qty" min="0" step="1"></td>
     <td class="c-rate" data-label="Rate (₹)"><input type="number" class="f-rate" min="0" step="0.01"></td>
-    <td class="amount-cell c-amt" data-label="Amount"><input type="text" inputmode="text" class="f-amount" placeholder="auto · e.g. 10*20*150 (* not x)"></td>
+    <td class="amount-cell c-amt" data-label="Amount"><input type="text" inputmode="text" class="f-amount" placeholder="auto"></td>
     <td class="c-remark" data-label="Remark (Client)"><input type="text" class="f-remark-client" placeholder="Client remark"></td>
     <td class="c-remark" data-label="Remark (Doer)"><input type="text" class="f-remark-doer" placeholder="Doer remark"></td>`;
 
@@ -1166,7 +1161,7 @@ function addLogisticsRowInto(tbody, data){
     <td data-label="Route"><input type="text" class="f-route" placeholder="e.g. Pune Airport to JW" value="${(data&&data.route)||''}"></td>
     <td class="c-qty" data-label="Qty"><input type="number" class="f-qty" min="0" step="1" value="${(data&&data.qty)||''}"></td>
     <td class="c-rate" data-label="Rate (₹)"><input type="number" class="f-rate" min="0" step="0.01" value="${(data&&data.rate)||''}"></td>
-    <td class="amount-cell c-amt" data-label="Amount"><input type="text" inputmode="text" class="f-amount" placeholder="auto · e.g. 10*20 (* not x)" value="${amtVal}"></td>
+    <td class="amount-cell c-amt" data-label="Amount"><input type="text" inputmode="text" class="f-amount" placeholder="auto" value="${amtVal}"></td>
     <td class="c-remark" data-label="Remark (Client)"><input type="text" class="f-remark-client" placeholder="Client remark" value="${(data&&(data.remarkClient!=null?data.remarkClient:data.remark))||''}"></td>
     <td class="c-remark" data-label="Remark (Doer)"><input type="text" class="f-remark-doer" placeholder="Doer remark" value="${(data&&data.remarkDoer)||''}"></td>
     <td><span class="row-remove" onclick="this.closest('tr').remove(); recalc();" title="Remove">&#10005;</span></td>`;
