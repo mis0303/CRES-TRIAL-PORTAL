@@ -391,6 +391,23 @@ function attachAmountCalc(inp, tr){
   inp.addEventListener('blur', run);
   inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); run(); inp.blur(); } });
 }
+// Size box: type a dimension like 15*15 (or 15x15 / 10ft x 20ft) -> auto-fill Sqft with the product.
+// Size text stays as typed; only Sqft is derived. Tick the Sqft checkbox to include it in the Amount.
+function attachSizeCalc(inp, tr){
+  if(!inp) return;
+  const run = ()=>{
+    const raw = inp.value;
+    if(/[*xX]/.test(raw)){                 // only when it's a multiplication
+      const v = evalAmount(raw);
+      if(v!=null){
+        const sq = tr.querySelector('.f-sqft');
+        if(sq){ sq.value = v; recalc(); }
+      }
+    }
+  };
+  inp.addEventListener('blur', run);
+  inp.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); run(); } });
+}
 
 const LOGISTICS = [
   { vehicle: "Sedan", routes: ["Pune Airport to JW Marriott", "Mumbai to Pune"] },
@@ -808,6 +825,7 @@ function addItemRow(tbody, opts){
   if(_amtInp){ _amtInp.addEventListener('input', ()=>{ tr.dataset.manualAmt = _amtInp.value.trim()!=="" ? "1" : "0"; }); }
   tr.querySelectorAll('input').forEach(el => el.addEventListener('input', recalc));
   attachAmountCalc(_amtInp, tr);
+  attachSizeCalc(tr.querySelector('.f-size'), tr);
 
   // Ensure this tbody is registered with item Sortable (lazy init for newly created tables)
   setupItemSortable(tbody);
