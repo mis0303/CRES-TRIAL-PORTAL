@@ -327,7 +327,7 @@ let CATEGORIES = []; // loaded from backend on init
 // Match is case-insensitive on the Library category name. Edit these lists
 // if your Library uses different spellings.
 // no-size -> hide Size + Sqft ; no-days -> also hide Days (calc = qty x rate)
-const NO_SIZE_CATS = ["man power","manpower","man-power","artist","artists","artist & entertainment","artist and entertainment","food & beverages","food and beverages","food & beverage","food and beverage","f&b","f & b","sfx","sfx (special effects)","special effects","security & safety","security and safety","security safety","collateral","collaterals","permission and liscences","permission and licences","permission and licenses","permission & licences","permission license","permission licence","permissions","communication","misc & transport","misc and transport","activities","event coverage","hampers and giveaway","hampers & giveaway","hampers and giveaways","hampers","venues","venue","technical","f&b catering","f & b catering","food and beverage catering","food & beverage catering","catering"];
+const NO_SIZE_CATS = ["man power","manpower","man-power","artist","artists","artist & entertainment","artist and entertainment","food & beverages","food and beverages","food & beverage","food and beverage","f&b","f & b","sfx","sfx (special effects)","special effects","security & safety","security and safety","security safety","collateral","collaterals","permission and liscences","permission and licences","permission and licenses","permission & licences","permission license","permission licence","permissions","communication","misc & transport","misc and transport","activities","event coverage","hampers and giveaway","hampers & giveaway","hampers and giveaways","hampers","venues","venue","technical","f&b catering","f & b catering","food and beverage catering","food & beverage catering","catering","awards & recognition","awards and recognition","awards","travel, lodging & boarding","travel lodging & boarding","travel lodging and boarding","travel & lodging","travel and lodging"];
 const NO_DAYS_CATS = ["man power","manpower","man-power","artist","artists","artist & entertainment","artist and entertainment","security & safety","security and safety","security safety","collateral","collaterals"];
 // KW -> keep Size but show header as "kW", hide Sqft + Days, amount = qty x rate (generator / power supply)
 const KW_CATS = ["generator","generators","dg","dg set","dg sets","generator set","generator sets","power supply"];
@@ -820,7 +820,6 @@ function addItemRow(tbody, opts){
   if(_amtInp){ _amtInp.addEventListener('input', ()=>{ tr.dataset.manualAmt = _amtInp.value.trim()!=="" ? "1" : "0"; }); }
   tr.querySelectorAll('input').forEach(el => el.addEventListener('input', recalc));
   attachAmountCalc(_amtInp, tr);
-  attachSizeCalc(tr.querySelector('.f-size'), tr);
 
   // Ensure this tbody is registered with item Sortable (lazy init for newly created tables)
   setupItemSortable(tbody);
