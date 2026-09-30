@@ -812,8 +812,8 @@ function addItemRow(tbody, opts){
     <td class="c-qty" data-label="Qty"><input type="number" class="f-qty" min="0" step="1"></td>
     <td class="c-rate" data-label="Rate (₹)"><input type="number" class="f-rate" min="0" step="0.01"></td>
     <td class="amount-cell c-amt" data-label="Amount"><input type="text" inputmode="text" class="f-amount" placeholder="auto"></td>
-    <td class="c-remark" data-label="Remark (Client)"><input type="text" class="f-remark-client" placeholder="Client remark"></td>
-    <td class="c-remark" data-label="Remark (Doer)"><input type="text" class="f-remark-doer" placeholder="Doer remark"></td>`;
+    <td class="c-remark" data-label="Remark (Client)"><input type="text" class="f-remark-client" placeholder="Remark to Client"></td>
+    <td class="c-remark" data-label="Remark (Doer)"><input type="text" class="f-remark-doer" placeholder="Remark to Doer"></td>`;
 
   tbody.appendChild(tr);
   const _amtInp = tr.querySelector('.f-amount');
@@ -1161,8 +1161,8 @@ function addLogisticsRowInto(tbody, data){
     <td class="c-qty" data-label="Qty"><input type="number" class="f-qty" min="0" step="1" value="${(data&&data.qty)||''}"></td>
     <td class="c-rate" data-label="Rate (₹)"><input type="number" class="f-rate" min="0" step="0.01" value="${(data&&data.rate)||''}"></td>
     <td class="amount-cell c-amt" data-label="Amount"><input type="text" inputmode="text" class="f-amount" placeholder="auto" value="${amtVal}"></td>
-    <td class="c-remark" data-label="Remark (Client)"><input type="text" class="f-remark-client" placeholder="Client remark" value="${(data&&(data.remarkClient!=null?data.remarkClient:data.remark))||''}"></td>
-    <td class="c-remark" data-label="Remark (Doer)"><input type="text" class="f-remark-doer" placeholder="Doer remark" value="${(data&&data.remarkDoer)||''}"></td>
+    <td class="c-remark" data-label="Remark (Client)"><input type="text" class="f-remark-client" placeholder="Remark to Client" value="${(data&&(data.remarkClient!=null?data.remarkClient:data.remark))||''}"></td>
+    <td class="c-remark" data-label="Remark (Doer)"><input type="text" class="f-remark-doer" placeholder="Remark to Doer" value="${(data&&data.remarkDoer)||''}"></td>
     <td><span class="row-remove" onclick="this.closest('tr').remove(); recalc();" title="Remove">&#10005;</span></td>`;
   if(data && data.manualAmt) tr.dataset.manualAmt = "1";
   tbody.appendChild(tr);
